@@ -27,7 +27,13 @@ export default function DaftarPage() {
     const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { nama } },
+      options: {
+        data: {
+          nama,
+          full_name: nama,
+          name: nama,
+        },
+      },
     });
 
     if (signUpError) {

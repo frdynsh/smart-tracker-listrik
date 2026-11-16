@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { createClient } from "@/lib/supabase";
 import {
@@ -23,6 +24,7 @@ async function sha256Hex(text: string) {
 }
 
 export default function PerangkatPage() {
+  const router = useRouter();
   const supabase = createClient();
   const [devices, setDevices] = useState<any[]>([]);
   const [nama, setNama] = useState("");
@@ -32,6 +34,8 @@ export default function PerangkatPage() {
     id: string;
     key: string;
   } | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const loadDevices = async () => {
@@ -51,10 +55,32 @@ export default function PerangkatPage() {
 
   const handleAddDevice = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg("");
+    setSubmitting(true);
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setErrorMsg("Sesi login tidak ditemukan. Silakan masuk kembali.");
+      setSubmitting(false);
+      router.push("/masuk");
+      return;
+    }
+
+    // Pastikan profil user tersedia di tabel profiles
+    await supabase
+      .from("profiles")
+      .upsert(
+        {
+          id: user.id,
+          nama:
+            user.user_metadata?.nama ||
+            user.user_metadata?.full_name ||
+            "Pengguna",
+        },
+        { onConflict: "id", ignoreDuplicates: true },
+      );
 
     const rawApiKey = "stl_" + crypto.randomUUID().replace(/-/g, "");
     const keyHash = await sha256Hex(rawApiKey);
@@ -71,7 +97,14 @@ export default function PerangkatPage() {
       .select()
       .single();
 
-    if (!error && data) {
+    setSubmitting(false);
+
+    if (error) {
+      setErrorMsg("Gagal menyimpan perangkat: " + error.message);
+      return;
+    }
+
+    if (data) {
       setGeneratedCreds({ id: data.id, key: rawApiKey });
       setNama("");
       loadDevices();
@@ -99,7 +132,12 @@ export default function PerangkatPage() {
         1 alat PZEM-004T memantau 1 perangkat elektronik (maksimal beban 600 W).
       </p>
 
-      {/* Modal Kredensial Sekali Tampil */}
+      {errorMsg && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 text-sm rounded-xl">
+          {errorMsg}
+        </div>
+      )}
+
       {generatedCreds && (
         <div className="mb-6 p-5 bg-amber-50 border border-amber-300 rounded-2xl">
           <div className="flex items-center gap-2 font-bold text-amber-900 mb-2">
@@ -118,6 +156,7 @@ export default function PerangkatPage() {
                 <strong>device_id:</strong> {generatedCreds.id}
               </span>
               <button
+                type="button"
                 onClick={() => navigator.clipboard.writeText(generatedCreds.id)}
                 className="text-teal-700 flex items-center gap-1"
               >
@@ -129,6 +168,7 @@ export default function PerangkatPage() {
                 <strong>api_key:</strong> {generatedCreds.key}
               </span>
               <button
+                type="button"
                 onClick={() =>
                   navigator.clipboard.writeText(generatedCreds.key)
                 }
@@ -139,6 +179,7 @@ export default function PerangkatPage() {
             </div>
           </div>
           <button
+            type="button"
             onClick={() => setGeneratedCreds(null)}
             className="mt-3 px-4 py-1.5 bg-amber-800 text-white text-xs font-semibold rounded-lg"
           >
@@ -147,7 +188,6 @@ export default function PerangkatPage() {
         </div>
       )}
 
-      {/* Form Tambah Perangkat */}
       <form
         onSubmit={handleAddDevice}
         className="bg-white p-5 rounded-2xl border border-slate-200 mb-8 grid md:grid-cols-4 gap-4 items-end"
@@ -196,13 +236,14 @@ export default function PerangkatPage() {
         </div>
         <button
           type="submit"
-          className="flex items-center justify-center gap-2 py-2 px-4 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700"
+          disabled={submitting}
+          className="flex items-center justify-center gap-2 py-2 px-4 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-50"
         >
-          <Plus className="w-4 h-4" /> Tambah Perangkat
+          <Plus className="w-4 h-4" />{" "}
+          {submitting ? "Menyimpan..." : "Tambah Perangkat"}
         </button>
       </form>
 
-      {/* Daftar Perangkat */}
       {loading ? (
         <p className="text-sm text-slate-500">Memuat perangkat...</p>
       ) : devices.length === 0 ? (
