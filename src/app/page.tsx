@@ -1,5 +1,6 @@
 // src/app/page.tsx
 import Link from "next/link";
+import FaqAccordion from "@/components/FaqAccordion";
 import { redirect } from "next/navigation";
 // Aktifkan import ini setelah setup Supabase SSR selesai:
 // import { createClient } from "@/lib/supabase/server";
@@ -42,7 +43,7 @@ export default async function LandingPage() {
             </div>
           </Link>
 
-          {/* Center Links (Selaras dengan section di halaman) */}
+          {/* Center Links */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-on-surface">
             <a
               href="#pratinjau"
@@ -62,8 +63,8 @@ export default async function LandingPage() {
             >
               Perangkat IoT
             </a>
-            <a href="#mulai" className="hover:text-primary transition-colors">
-              Mulai
+            <a href="#faq" className="hover:text-primary transition-colors">
+              FAQ
             </a>
           </nav>
 
@@ -88,7 +89,10 @@ export default async function LandingPage() {
       {/* MAIN CONTAINER */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-12 py-8 sm:py-10 lg:py-14 flex flex-col gap-12 sm:gap-14 lg:gap-16">
         {/* 2. HERO SECTION (Split 2-Column Layout) */}
-        <section id="pratinjau" className="scroll-mt-24 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center" >
+        <section
+          id="pratinjau"
+          className="scroll-mt-24 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center"
+        >
           {/* Left Column: Copy & CTAs */}
           <div className="lg:col-span-6 flex flex-col items-start gap-5">
             {/* Pill Badge */}
@@ -127,7 +131,7 @@ export default async function LandingPage() {
               </Link>
             </div>
 
-            {/* Trust Points Row (Selaras PRD v1.2) */}
+            {/* Trust Points Row */}
             <div className="pt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-on-surface-variant">
               <span className="flex items-center gap-1.5 font-semibold text-on-surface">
                 <span className="text-primary">✓</span> Tanpa langganan bulanan
@@ -318,7 +322,7 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* 3. INFO / PRINCIPLE BANNER (Batas Klaim PRD v1.2) */}
+        {/* 3. INFO / PRINCIPLE BANNER */}
         <section
           id="prinsip"
           className="scroll-mt-24 w-full p-4 sm:p-5 rounded-2xl bg-surface-container-lowest border border-outline-variant flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs"
@@ -523,7 +527,26 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* 6. LARGE BOTTOM CTA CARD */}
+        {/* 6. FAQ SECTION */}
+        <section
+          id="faq"
+          className="scroll-mt-24 flex flex-col items-center pt-2"
+        >
+          <div className="inline-flex items-center px-3.5 py-1 rounded-full bg-surface-container border border-outline-variant text-on-surface text-xs font-bold tracking-wider uppercase mb-3">
+            FAQ &amp; BANTUAN
+          </div>
+          <h2 className="font-extrabold text-2xl sm:text-3xl lg:text-4xl text-on-primary-fixed-variant text-center leading-tight">
+            Pertanyaan yang Sering Diajukan
+          </h2>
+          <p className="text-on-surface-variant text-sm sm:text-base max-w-2xl text-center mt-2 mb-8 sm:mb-10">
+            Hal-hal penting yang perlu Anda ketahui tentang modul Smart Tracker
+            IoT dan sistem pemantauan listrik perangkat.
+          </p>
+
+          <FaqAccordion />
+        </section>
+
+        {/* 7. LARGE BOTTOM CTA CARD */}
         <section
           id="mulai"
           className="scroll-mt-24 rounded-3xl bg-primary text-on-primary p-7 sm:p-12 lg:p-14 flex flex-col items-center text-center shadow-md"
@@ -560,7 +583,7 @@ export default async function LandingPage() {
         </section>
       </main>
 
-      {/* 7. FOOTER */}
+      {/* 8. FOOTER */}
       <footer className="w-full bg-surface-container-lowest border-t border-outline-variant mt-8 py-8 sm:py-10 text-xs text-on-surface-variant">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 flex flex-col gap-6 sm:gap-8">
           {/* Top Row */}
@@ -578,10 +601,10 @@ export default async function LandingPage() {
 
             <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-semibold text-on-surface">
               <a
-                href="#prinsip"
+                href="#pratinjau"
                 className="hover:text-primary transition-colors"
               >
-                Prinsip Kerja
+                Pratinjau
               </a>
               <a
                 href="#cara-kerja"
@@ -594,6 +617,9 @@ export default async function LandingPage() {
                 className="hover:text-primary transition-colors"
               >
                 Perangkat IoT
+              </a>
+              <a href="#faq" className="hover:text-primary transition-colors">
+                FAQ
               </a>
               <Link
                 href="/masuk"
