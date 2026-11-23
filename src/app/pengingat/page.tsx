@@ -277,12 +277,12 @@ export default function PengingatPage() {
         {/* 1. HEADER BLOCK */}
         <div className="min-w-0">
           <div className="flex items-center gap-3">
-            <span className="text-xs text-secondary uppercase tracking-widest font-bold">
+            <span className="text-xs text-primary-container uppercase tracking-widest font-bold">
               Pengaturan Ambang Batas
             </span>
             <span className="h-1 w-8 bg-secondary-container rounded-full inline-block shrink-0" />
           </div>
-          <h1 className="font-extrabold text-2xl sm:text-3xl text-on-surface tracking-tight mt-1">
+          <h1 className="font-extrabold text-2xl sm:text-3xl lg:text-[36px] text-on-surface tracking-tight mt-1">
             Pengingat &amp; Batas Aman
           </h1>
           <p className="text-sm sm:text-base text-on-surface-variant max-w-2xl mt-1 leading-relaxed">

@@ -307,7 +307,7 @@ export default function PantauPage() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="flex flex-col min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1">
-              <span className="text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+              <span className="text-xs uppercase tracking-wider text-primary-container font-bold">
                 Pantauan Konsumsi Listrik
               </span>
             </div>
