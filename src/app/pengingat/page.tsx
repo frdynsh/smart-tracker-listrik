@@ -36,6 +36,7 @@ interface DeviceSummary {
 }
 
 const OFFLINE_THRESHOLD_MS = 120_000;
+const ITEMS_PER_PAGE = 5;
 
 function formatRelativeTime(isoDate: string): string {
   const diffMs = Date.now() - new Date(isoDate).getTime();
@@ -58,6 +59,7 @@ export default function PengingatPage() {
   const [notifs, setNotifs] = useState<NotificationItem[]>([]);
   const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   // State pengaturan ambang batas
   const [durasiJam, setDurasiJam] = useState<string>("8");
@@ -101,6 +103,7 @@ export default function PengingatPage() {
       ]);
 
     setNotifs((notifData as NotificationItem[]) || []);
+    setCurrentPage(1);
 
     (rulesData as AlertRule[] | null)?.forEach((r) => {
       if (r.tipe === "durasi_lama") {
@@ -153,6 +156,14 @@ export default function PengingatPage() {
     () => devices.filter((d) => d.isOnline).length,
     [devices],
   );
+
+  const totalPages = Math.max(1, Math.ceil(notifs.length / ITEMS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  const paginatedNotifs = useMemo(() => {
+    const startIdx = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
+    return notifs.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+  }, [notifs, safeCurrentPage]);
 
   const handleMarkAllRead = async () => {
     const {
@@ -262,35 +273,35 @@ export default function PengingatPage() {
 
   return (
     <AppShell>
-      <div className="flex flex-col w-full gap-6">
+      <div className="flex flex-col w-full max-w-full overflow-x-hidden gap-4 sm:gap-6">
         {/* 1. HEADER BLOCK */}
-        <div>
+        <div className="min-w-0">
           <div className="flex items-center gap-3">
             <span className="text-xs text-secondary uppercase tracking-widest font-bold">
               Pengaturan Ambang Batas
             </span>
-            <span className="h-1 w-8 bg-secondary-container rounded-full inline-block" />
+            <span className="h-1 w-8 bg-secondary-container rounded-full inline-block shrink-0" />
           </div>
           <h1 className="font-extrabold text-2xl sm:text-3xl text-on-surface tracking-tight mt-1">
             Pengingat &amp; Batas Aman
           </h1>
-          <p className="text-sm sm:text-base text-on-surface-variant max-w-2xl mt-1">
+          <p className="text-sm sm:text-base text-on-surface-variant max-w-2xl mt-1 leading-relaxed">
             Pantau notifikasi peringatan konsumsi listrik dan tentukan ambang
             batas aman untuk perangkat di rumah Anda.
           </p>
         </div>
 
         {/* 2. MASTER TWO-COLUMN GRID (7 COLS LEFT + 5 COLS RIGHT) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
           {/* LEFT COLUMN: PERINGATAN MASUK (7 COLS) */}
-          <section className="lg:col-span-7 flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-2 pb-1">
-              <div className="flex items-center gap-3">
+          <section className="lg:col-span-7 flex flex-col gap-3.5 sm:gap-4 min-w-0">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
+              <div className="flex items-center gap-2.5 sm:gap-3">
                 <h2 className="font-bold text-lg sm:text-xl text-on-surface tracking-tight">
                   Peringatan Masuk
                 </h2>
                 {unreadCount > 0 && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs bg-secondary-fixed text-on-secondary-fixed font-bold whitespace-nowrap">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs bg-secondary-fixed text-on-secondary-fixed font-bold whitespace-nowrap shrink-0">
                     {unreadCount} Baru
                   </span>
                 )}
@@ -300,19 +311,19 @@ export default function PengingatPage() {
                 <button
                   type="button"
                   onClick={handleMarkAllRead}
-                  className="text-xs sm:text-sm font-semibold text-primary-container hover:underline transition-all cursor-pointer whitespace-nowrap"
+                  className="text-xs sm:text-sm font-semibold text-primary-container hover:underline transition-all cursor-pointer whitespace-nowrap py-1"
                 >
                   Tandai semua terbaca
                 </button>
               )}
             </div>
 
-            <p className="text-xs sm:text-sm text-on-surface-variant -mt-2">
+            <p className="text-xs sm:text-sm text-on-surface-variant -mt-2 leading-relaxed">
               Riwayat peringatan otomatis saat pemakaian melebihi batas durasi
               atau target biaya bulanan
             </p>
 
-            {/* Notification Feed List */}
+            {/* Notification Feed List (Max 5 per page) */}
             {loading ? (
               <div className="space-y-3">
                 {[1, 2].map((i) => (
@@ -323,7 +334,7 @@ export default function PengingatPage() {
                 ))}
               </div>
             ) : notifs.length === 0 ? (
-              <div className="bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-8 text-center flex flex-col items-center gap-2 shadow-2xs">
+              <div className="bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-6 sm:p-8 text-center flex flex-col items-center gap-2 shadow-2xs">
                 <div className="w-12 h-12 rounded-2xl bg-[#EFF6FF] text-primary-container flex items-center justify-center mb-1">
                   <span className="material-symbols-outlined text-[26px]">
                     notifications_paused
@@ -332,149 +343,229 @@ export default function PengingatPage() {
                 <h3 className="font-bold text-base text-on-surface">
                   Belum ada notifikasi peringatan
                 </h3>
-                <p className="text-xs sm:text-sm text-on-surface-variant max-w-md">
+                <p className="text-xs sm:text-sm text-on-surface-variant max-w-md leading-relaxed">
                   Semua perangkat terpantau berada dalam batas durasi dan target
                   biaya yang Anda tetapkan.
                 </p>
               </div>
             ) : (
-              <div className="flex flex-col gap-3.5">
-                {notifs.map((n) => {
-                  const isUnread = !n.dibaca;
-                  const isCostAlert =
-                    n.tipe === "estimasi_biaya" ||
-                    n.judul.toLowerCase().includes("biaya") ||
-                    n.isi.toLowerCase().includes("rp");
+              <>
+                <div className="flex flex-col gap-3.5">
+                  {paginatedNotifs.map((n) => {
+                    const isUnread = !n.dibaca;
+                    const isCostAlert =
+                      n.tipe === "estimasi_biaya" ||
+                      n.judul.toLowerCase().includes("biaya") ||
+                      n.isi.toLowerCase().includes("rp");
 
-                  return (
-                    <article
-                      key={n.id}
-                      onClick={() => {
-                        if (isUnread) handleMarkSingleRead(n.id);
-                      }}
-                      className={`bg-surface-container-lowest border rounded-xl p-5 flex flex-col gap-3 shadow-2xs relative transition-all hover:shadow-sm ${
-                        isUnread
-                          ? "border-secondary-container/70 cursor-pointer"
-                          : "border-outline-variant/70 opacity-90 hover:opacity-100"
-                      }`}
-                    >
-                      {/* Left accent strip for unread items */}
-                      {isUnread && (
-                        <div className="absolute left-0 top-3.5 bottom-3.5 w-1.5 bg-secondary-container rounded-r-md" />
-                      )}
-
-                      <div
-                        className={`flex items-center justify-between gap-2 ${
-                          isUnread ? "pl-2" : ""
+                    return (
+                      <article
+                        key={n.id}
+                        onClick={() => {
+                          if (isUnread) handleMarkSingleRead(n.id);
+                        }}
+                        className={`bg-surface-container-lowest border rounded-xl p-4 sm:p-5 flex flex-col gap-3 shadow-2xs relative transition-all hover:shadow-sm min-w-0 ${
+                          isUnread
+                            ? "border-secondary-container/70 cursor-pointer"
+                            : "border-outline-variant/70 opacity-90 hover:opacity-100"
                         }`}
                       >
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold whitespace-nowrap ${
-                              isUnread
-                                ? "bg-secondary-fixed text-on-secondary-fixed"
-                                : "bg-surface-container-high text-on-surface-variant"
-                            }`}
-                          >
-                            <span className="material-symbols-outlined text-[15px]">
-                              {isCostAlert ? "payments" : "schedule"}
-                            </span>
-                            <span>
-                              {isCostAlert
-                                ? "Peringatan Biaya"
-                                : "Alat Menyala Lama"}
-                            </span>
-                          </span>
-                          <span className="text-xs text-on-surface-variant font-medium">
-                            {formatRelativeTime(n.created_at)}
-                          </span>
-                        </div>
+                        {/* Left accent strip for unread items */}
+                        {isUnread && (
+                          <div className="absolute left-0 top-3.5 bottom-3.5 w-1.5 bg-secondary-container rounded-r-md" />
+                        )}
 
-                        {isUnread ? (
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="w-2.5 h-2.5 rounded-full bg-primary-container" />
-                            <span className="text-xs text-primary-container font-bold">
-                              Baru
+                        <div
+                          className={`flex flex-wrap items-center justify-between gap-2 ${
+                            isUnread ? "pl-2" : ""
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold whitespace-nowrap ${
+                                isUnread
+                                  ? "bg-secondary-fixed text-on-secondary-fixed"
+                                  : "bg-surface-container-high text-on-surface-variant"
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-[15px] shrink-0">
+                                {isCostAlert ? "payments" : "schedule"}
+                              </span>
+                              <span>
+                                {isCostAlert
+                                  ? "Peringatan Biaya"
+                                  : "Alat Menyala Lama"}
+                              </span>
+                            </span>
+                            <span className="text-xs text-on-surface-variant font-medium">
+                              {formatRelativeTime(n.created_at)}
                             </span>
                           </div>
-                        ) : (
-                          <span className="text-xs text-outline font-semibold shrink-0">
-                            Sudah Dibaca
-                          </span>
-                        )}
-                      </div>
 
-                      <div className={isUnread ? "pl-2" : ""}>
-                        <h3 className="font-bold text-base sm:text-lg text-on-surface leading-snug">
-                          {n.judul}
-                        </h3>
-                        <p className="text-xs sm:text-sm text-on-surface-variant mt-1 leading-relaxed">
-                          {n.isi}
-                        </p>
-                      </div>
+                          {isUnread ? (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="w-2.5 h-2.5 rounded-full bg-primary-container" />
+                              <span className="text-xs text-primary-container font-bold">
+                                Baru
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-outline font-semibold shrink-0">
+                              Sudah Dibaca
+                            </span>
+                          )}
+                        </div>
 
-                      <div
-                        className={`pt-2 flex items-center justify-between flex-wrap gap-2 border-t border-surface-container ${
-                          isUnread ? "pl-2" : ""
-                        }`}
-                      >
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-surface-container text-on-surface-variant font-semibold">
-                          <span className="material-symbols-outlined text-[15px]">
-                            sensors
-                          </span>
-                          <span>Deteksi Otomatis Sensor</span>
-                        </span>
+                        <div className={isUnread ? "pl-2" : ""}>
+                          <h3 className="font-bold text-base sm:text-lg text-on-surface leading-snug break-words">
+                            {n.judul}
+                          </h3>
+                          <p className="text-xs sm:text-sm text-on-surface-variant mt-1 leading-relaxed break-words">
+                            {n.isi}
+                          </p>
+                        </div>
 
-                        <Link
-                          href={n.link || "/cek"}
-                          onClick={() => {
-                            if (isUnread) handleMarkSingleRead(n.id);
-                          }}
-                          className="inline-flex items-center gap-1 text-xs sm:text-sm text-primary-container font-bold hover:underline transition-all whitespace-nowrap"
+                        <div
+                          className={`pt-2 flex items-center justify-between flex-wrap gap-2 border-t border-surface-container ${
+                            isUnread ? "pl-2" : ""
+                          }`}
                         >
-                          <span>Cek Penyebab</span>
-                          <span className="material-symbols-outlined text-[16px]">
-                            arrow_forward
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-surface-container text-on-surface-variant font-semibold">
+                            <span className="material-symbols-outlined text-[15px] shrink-0">
+                              sensors
+                            </span>
+                            <span>Deteksi Otomatis Sensor</span>
                           </span>
-                        </Link>
+
+                          <Link
+                            href={n.link || "/cek"}
+                            onClick={() => {
+                              if (isUnread) handleMarkSingleRead(n.id);
+                            }}
+                            className="inline-flex items-center gap-1 text-xs sm:text-sm text-primary-container font-bold hover:underline transition-all whitespace-nowrap py-1"
+                          >
+                            <span>Cek Penyebab</span>
+                            <span className="material-symbols-outlined text-[16px]">
+                              arrow_forward
+                            </span>
+                          </Link>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-surface-container-lowest border border-outline-variant/70 rounded-xl px-3.5 sm:px-4 py-2.5 shadow-2xs">
+                    <span className="text-xs text-on-surface-variant font-medium">
+                      Menampilkan{" "}
+                      <strong className="text-on-surface">
+                        {(safeCurrentPage - 1) * ITEMS_PER_PAGE + 1}–
+                        {Math.min(
+                          safeCurrentPage * ITEMS_PER_PAGE,
+                          notifs.length,
+                        )}
+                      </strong>{" "}
+                      dari{" "}
+                      <strong className="text-on-surface">
+                        {notifs.length}
+                      </strong>{" "}
+                      notifikasi
+                    </span>
+
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCurrentPage((prev) => Math.max(1, prev - 1))
+                        }
+                        disabled={safeCurrentPage === 1}
+                        aria-label="Halaman sebelumnya"
+                        className="min-h-[36px] px-2.5 sm:px-3 rounded-lg border border-outline-variant/60 bg-surface hover:bg-surface-container text-on-surface text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">
+                          chevron_left
+                        </span>
+                        <span className="hidden sm:inline">Sebelumnya</span>
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        {Array.from(
+                          { length: totalPages },
+                          (_, idx) => idx + 1,
+                        ).map((page) => (
+                          <button
+                            key={page}
+                            type="button"
+                            onClick={() => setCurrentPage(page)}
+                            aria-current={
+                              safeCurrentPage === page ? "page" : undefined
+                            }
+                            className={`w-9 h-9 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                              safeCurrentPage === page
+                                ? "bg-primary-container text-on-primary shadow-2xs"
+                                : "bg-surface hover:bg-surface-container text-on-surface-variant"
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
                       </div>
-                    </article>
-                  );
-                })}
-              </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCurrentPage((prev) =>
+                            Math.min(totalPages, prev + 1),
+                          )
+                        }
+                        disabled={safeCurrentPage === totalPages}
+                        aria-label="Halaman berikutnya"
+                        className="min-h-[36px] px-2.5 sm:px-3 rounded-lg border border-outline-variant/60 bg-surface hover:bg-surface-container text-on-surface text-xs font-semibold inline-flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        <span className="hidden sm:inline">Berikutnya</span>
+                        <span className="material-symbols-outlined text-[16px]">
+                          chevron_right
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Summary Banner Below Alerts */}
-            <div className="bg-surface-container border border-outline-variant/60 rounded-xl p-4 flex items-center justify-between gap-4 mt-1">
-              <div className="flex items-center gap-3">
+            <div className="bg-surface-container border border-outline-variant/60 rounded-xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mt-1">
+              <div className="flex items-start sm:items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center shrink-0 text-primary-container">
                   <span className="material-symbols-outlined text-[22px]">
                     insights
                   </span>
                 </div>
-                <div className="flex flex-col">
+                <div className="flex flex-col min-w-0">
                   <span className="text-sm text-on-surface font-bold">
                     Total Riwayat Notifikasi In-App
                   </span>
-                  <span className="text-xs text-on-surface-variant">
+                  <span className="text-xs text-on-surface-variant leading-relaxed">
                     Notifikasi tercatat otomatis setiap kali sensor melaporkan
                     kondisi melewati batas.
                   </span>
                 </div>
               </div>
-              <span className="text-base sm:text-lg text-primary font-extrabold whitespace-nowrap shrink-0">
+              <span className="text-sm sm:text-lg text-primary font-extrabold whitespace-nowrap shrink-0 self-end sm:self-center">
                 {notifs.length} Notifikasi
               </span>
             </div>
           </section>
 
           {/* RIGHT COLUMN: ATUR BATAS PERINGATAN (5 COLS) */}
-          <section className="lg:col-span-5 flex flex-col gap-4">
+          <section className="lg:col-span-5 flex flex-col gap-3.5 sm:gap-4 min-w-0">
             <div className="pb-1">
               <h2 className="font-bold text-lg sm:text-xl text-on-surface tracking-tight">
                 Atur Batas Peringatan
               </h2>
-              <p className="text-xs sm:text-sm text-on-surface-variant mt-1">
+              <p className="text-xs sm:text-sm text-on-surface-variant mt-1 leading-relaxed">
                 Sesuaikan toleransi durasi alat dan batas biaya bulanan agar
                 peringatan tepat sasaran.
               </p>
@@ -483,14 +574,14 @@ export default function PengingatPage() {
             {/* Main Configuration Form */}
             <form
               onSubmit={handleSaveRules}
-              className="bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-6 shadow-2xs flex flex-col gap-5"
+              className="bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-4 sm:p-6 shadow-2xs flex flex-col gap-4 sm:gap-5"
             >
               {/* Setting Box 1: Batas Durasi Alat */}
-              <div className="flex flex-col gap-3 bg-surface-container-low border border-outline-variant/50 p-4 rounded-xl">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex flex-col">
+              <div className="flex flex-col gap-3 bg-surface-container-low border border-outline-variant/50 p-3.5 sm:p-4 rounded-xl">
+                <div className="flex items-start justify-between gap-3 sm:gap-4">
+                  <div className="flex flex-col min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary-container text-[20px]">
+                      <span className="material-symbols-outlined text-primary-container text-[20px] shrink-0">
                         timelapse
                       </span>
                       <label
@@ -500,7 +591,7 @@ export default function PengingatPage() {
                         Batas Durasi Alat Menyala
                       </label>
                     </div>
-                    <p className="text-xs text-on-surface-variant mt-1">
+                    <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
                       Kirim peringatan jika alat aktif terus-menerus tanpa jeda
                     </p>
                   </div>
@@ -527,8 +618,8 @@ export default function PengingatPage() {
                 </div>
 
                 {/* Numeric Input Row */}
-                <div className="mt-1 flex items-center gap-2.5">
-                  <div className="relative flex-1 bg-surface-container-lowest border border-outline-variant/70 rounded-lg px-3.5 py-2 flex items-center justify-between">
+                <div className="mt-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                  <div className="relative flex-1 bg-surface-container-lowest border border-outline-variant/70 rounded-lg px-3.5 py-2 flex items-center justify-between min-w-0">
                     <input
                       id="durationInput"
                       type="number"
@@ -537,9 +628,9 @@ export default function PengingatPage() {
                       max="48"
                       value={durasiJam}
                       onChange={(e) => setDurasiJam(e.target.value)}
-                      className="w-24 bg-transparent text-2xl text-on-surface font-extrabold focus:outline-none tracking-tight"
+                      className="w-full min-w-0 bg-transparent text-xl sm:text-2xl text-on-surface font-extrabold focus:outline-none tracking-tight"
                     />
-                    <span className="text-sm text-on-surface-variant font-bold">
+                    <span className="text-sm text-on-surface-variant font-bold shrink-0 ml-2">
                       Jam
                     </span>
                   </div>
@@ -548,9 +639,9 @@ export default function PengingatPage() {
                     type="button"
                     onClick={handleQuickTest5Minutes}
                     title="Ubah cepat ke 5 menit (0,08 jam) untuk uji coba"
-                    className="px-3 py-3 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-bold transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                    className="min-h-[44px] px-3.5 py-2.5 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-bold transition-colors shrink-0 flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
                   >
-                    <span className="material-symbols-outlined text-[16px] text-secondary">
+                    <span className="material-symbols-outlined text-[16px] text-secondary shrink-0">
                       science
                     </span>
                     <span>5 Menit Tes</span>
@@ -570,11 +661,11 @@ export default function PengingatPage() {
               </div>
 
               {/* Setting Box 2: Batas Anggaran Bulanan */}
-              <div className="flex flex-col gap-3 bg-surface-container-low border border-outline-variant/50 p-4 rounded-xl">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex flex-col">
+              <div className="flex flex-col gap-3 bg-surface-container-low border border-outline-variant/50 p-3.5 sm:p-4 rounded-xl">
+                <div className="flex items-start justify-between gap-3 sm:gap-4">
+                  <div className="flex flex-col min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary-container text-[20px]">
+                      <span className="material-symbols-outlined text-primary-container text-[20px] shrink-0">
                         account_balance_wallet
                       </span>
                       <label
@@ -584,7 +675,7 @@ export default function PengingatPage() {
                         Batas Anggaran Bulanan
                       </label>
                     </div>
-                    <p className="text-xs text-on-surface-variant mt-1">
+                    <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
                       Kirim peringatan jika estimasi biaya akhir bulan melewati
                       angka ini
                     </p>
@@ -611,8 +702,8 @@ export default function PengingatPage() {
 
                 {/* Currency Input Row */}
                 <div className="mt-1">
-                  <div className="relative bg-surface-container-lowest border border-outline-variant/70 rounded-lg px-3.5 py-2.5 flex items-center justify-between gap-2">
-                    <span className="text-lg font-extrabold text-on-surface-variant">
+                  <div className="relative bg-surface-container-lowest border border-outline-variant/70 rounded-lg px-3.5 py-2.5 flex items-center justify-between gap-2 min-w-0">
+                    <span className="text-base sm:text-lg font-extrabold text-on-surface-variant shrink-0">
                       Rp
                     </span>
                     <input
@@ -622,9 +713,9 @@ export default function PengingatPage() {
                       min="1000"
                       value={batasRp}
                       onChange={(e) => setBatasRp(e.target.value)}
-                      className="w-full bg-transparent text-2xl text-on-surface font-extrabold focus:outline-none tracking-tight"
+                      className="w-full min-w-0 bg-transparent text-xl sm:text-2xl text-on-surface font-extrabold focus:outline-none tracking-tight"
                     />
-                    <span className="material-symbols-outlined text-on-surface-variant text-[20px]">
+                    <span className="material-symbols-outlined text-on-surface-variant text-[20px] shrink-0">
                       edit
                     </span>
                   </div>
@@ -664,10 +755,10 @@ export default function PengingatPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="w-full bg-primary-container hover:bg-primary text-on-primary text-sm sm:text-base py-3 px-6 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer disabled:opacity-60"
+                  className="w-full min-h-[48px] bg-primary-container hover:bg-primary text-on-primary text-sm sm:text-base py-3 px-6 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer disabled:opacity-60"
                 >
                   <span
-                    className={`material-symbols-outlined text-[20px] ${
+                    className={`material-symbols-outlined text-[20px] shrink-0 ${
                       saving ? "animate-spin" : ""
                     }`}
                   >
@@ -681,7 +772,7 @@ export default function PengingatPage() {
                 <button
                   type="button"
                   onClick={handleResetDefault}
-                  className="text-center text-xs sm:text-sm font-semibold text-on-surface-variant hover:text-on-surface hover:underline transition-colors py-1 cursor-pointer"
+                  className="min-h-[40px] text-center text-xs sm:text-sm font-semibold text-on-surface-variant hover:text-on-surface hover:underline transition-colors py-1.5 cursor-pointer"
                 >
                   Kembalikan ke Rekomendasi Standar
                 </button>
@@ -690,11 +781,11 @@ export default function PengingatPage() {
 
             {/* Sensor Health Card */}
             <div className="bg-surface-container border border-outline-variant/60 rounded-xl p-4 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-sm text-on-surface font-bold">
                   Sensor Terpasang di Rumah
                 </span>
-                <span className="text-xs font-semibold text-on-surface-variant">
+                <span className="text-xs font-semibold text-on-surface-variant whitespace-nowrap shrink-0">
                   {onlineDevicesCount}/{devices.length} Online
                 </span>
               </div>
@@ -708,16 +799,18 @@ export default function PengingatPage() {
                   {devices.slice(0, 3).map((dev) => (
                     <div
                       key={dev.id}
-                      className="bg-surface-container-lowest border border-outline-variant/50 p-2.5 rounded-lg flex flex-col gap-0.5"
+                      className="bg-surface-container-lowest border border-outline-variant/50 p-2.5 rounded-lg flex sm:flex-col items-center sm:items-start justify-between gap-1 min-w-0"
                     >
-                      <span className="text-xs text-on-surface font-bold truncate">
-                        {dev.nama}
-                      </span>
-                      <span className="text-[11px] text-on-surface-variant truncate">
-                        {dev.jenis_beban || "Terpasang"}
-                      </span>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs text-on-surface font-bold truncate">
+                          {dev.nama}
+                        </span>
+                        <span className="text-[11px] text-on-surface-variant truncate">
+                          {dev.jenis_beban || "Terpasang"}
+                        </span>
+                      </div>
                       <span
-                        className={`text-xs font-bold mt-1 ${
+                        className={`text-xs font-bold sm:mt-1 shrink-0 whitespace-nowrap ${
                           !dev.isOnline
                             ? "text-error"
                             : dev.latestWatt > 2
@@ -741,11 +834,13 @@ export default function PengingatPage() {
 
         {/* TOAST NOTIFICATION */}
         {toastMsg && (
-          <div className="fixed bottom-6 right-6 bg-surface-container-lowest text-on-surface px-5 py-3.5 rounded-xl shadow-lg border border-outline-variant/60 flex items-center gap-3 z-50">
-            <span className="material-symbols-outlined text-primary-container text-[20px]">
+          <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:bottom-6 sm:right-6 sm:max-w-md bg-surface-container-lowest text-on-surface px-4 sm:px-5 py-3.5 rounded-xl shadow-lg border border-outline-variant/60 flex items-center gap-3 z-50">
+            <span className="material-symbols-outlined text-primary-container text-[20px] shrink-0">
               check_circle
             </span>
-            <span className="text-xs sm:text-sm font-bold">{toastMsg}</span>
+            <span className="text-xs sm:text-sm font-bold leading-snug">
+              {toastMsg}
+            </span>
           </div>
         )}
       </div>
