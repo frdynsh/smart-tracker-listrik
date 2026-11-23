@@ -18,7 +18,7 @@ import {
 interface Device {
   id: string;
   nama: string;
-  lokasi?: string | null;
+  jenis_beban?: string | null;
   last_seen_at?: string | null;
 }
 
@@ -67,9 +67,8 @@ export default function PantauPage() {
 
     const { data: devs } = await supabase
       .from("devices")
-      .select("id, nama, lokasi, last_seen_at")
+      .select("id, nama, jenis_beban, last_seen_at")
       .order("created_at", { ascending: true });
-    setDevices((devs as Device[]) || []);
 
     // Cek ketersediaan data > 21 hari untuk tombol 30 Hari
     const twentyOneDaysAgo = new Date();
@@ -374,7 +373,7 @@ export default function PantauPage() {
               {devices.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.nama}
-                  {d.lokasi ? ` (${d.lokasi})` : ""}
+                  {d.jenis_beban ? ` (${d.jenis_beban})` : ""}
                 </option>
               ))}
             </select>
