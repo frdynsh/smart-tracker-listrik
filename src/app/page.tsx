@@ -18,66 +18,66 @@ export default async function LandingPage() {
   */
 
   return (
-    <div className="min-h-screen flex flex-col bg-surface text-on-surface overflow-x-clip">
-      {/* Header / Navbar */}
-      <header className="fixed top-0 w-full z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
-        <div className="h-16 sm:h-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 flex items-center justify-between gap-2">
+    <div className="min-h-screen flex flex-col bg-surface text-on-surface overflow-x-clip antialiased tabular-nums">
+      {/* 1. TOP NAVIGATION BAR */}
+      <header className="w-full bg-surface-container-lowest/95 backdrop-blur-md border-b border-outline-variant sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 h-16 sm:h-20 flex items-center justify-between gap-3">
+          {/* Left: Brand Logo */}
           <Link
             href="/"
-            className="flex items-center gap-2 sm:gap-space-sm group shrink-0"
+            className="flex items-center gap-2.5 sm:gap-3 shrink-0"
           >
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary-container flex items-center justify-center text-on-primary-container shadow-sm">
-              <span className="material-symbols-outlined text-[20px] sm:text-[24px]">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary flex items-center justify-center text-on-primary shadow-xs">
+              <span className="material-symbols-outlined text-[22px] sm:text-[24px]">
                 bolt
               </span>
             </div>
             <div className="flex flex-col">
-              <span className="text-base sm:text-headline-md tracking-tight text-on-surface font-bold leading-none">
+              <span className="font-extrabold text-base sm:text-xl tracking-tight text-on-primary-fixed-variant leading-tight">
                 Smart Tracker
               </span>
-              <span className="text-[10px] sm:text-label-sm uppercase tracking-wider text-primary font-semibold mt-0.5">
+              <span className="text-[10px] sm:text-xs font-bold tracking-wider text-on-surface-variant uppercase">
                 Listrik IoT
               </span>
             </div>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-space-xl">
+          {/* Center Links (Selaras dengan section di halaman) */}
+          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-on-surface">
             <a
-              href="#fitur"
-              className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors"
+              href="#pratinjau"
+              className="hover:text-primary transition-colors"
             >
-              Fitur
+              Pratinjau
             </a>
             <a
               href="#cara-kerja"
-              className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors"
+              className="hover:text-primary transition-colors"
             >
               Cara Kerja
             </a>
             <a
-              href="#instalasi"
-              className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors"
+              href="#perangkat"
+              className="hover:text-primary transition-colors"
             >
-              Perangkat Didukung
+              Perangkat IoT
             </a>
-            <a
-              href="#mulai"
-              className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors"
-            >
-              Mulai Sekarang
+            <a href="#mulai" className="hover:text-primary transition-colors">
+              Mulai
             </a>
           </nav>
 
-          <div className="flex items-center gap-1.5 sm:gap-space-md shrink-0">
+          {/* Right: Action Buttons */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <Link
               href="/masuk"
-              className="inline-flex items-center justify-center h-9 sm:h-11 px-2.5 sm:px-space-lg rounded-xl text-xs sm:text-title-sm font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+              className="px-3.5 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-semibold text-on-surface hover:bg-surface-container transition-colors"
             >
               Masuk
             </Link>
             <Link
               href="/daftar"
-              className="inline-flex items-center justify-center h-9 sm:h-11 px-3.5 sm:px-space-xl rounded-xl bg-primary text-on-primary text-xs sm:text-title-sm font-semibold shadow-sm hover:bg-primary-container transition-colors"
+              className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary font-semibold text-xs sm:text-sm shadow-xs transition-colors"
             >
               Daftar
             </Link>
@@ -85,613 +85,540 @@ export default async function LandingPage() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="w-full pt-16 sm:pt-20 bg-surface flex-1">
-        <div className="flex flex-col w-full">
-          {/* 1. Hero Section */}
-          <section className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 pt-6 sm:pt-10 pb-12 sm:pb-16">
-            {/* Ambient Glow */}
-            <div className="absolute top-12 left-1/4 w-72 sm:w-96 h-72 sm:h-96 bg-primary-fixed-dim/20 rounded-full blur-3xl pointer-events-none -z-10" />
-            <div className="absolute top-36 right-4 sm:right-10 w-64 sm:w-80 h-64 sm:h-80 bg-secondary-container/20 rounded-full blur-3xl pointer-events-none -z-10" />
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
-              {/* Left Column: Copy & Actions */}
-              <div className="lg:col-span-6 flex flex-col items-start">
-                <div className="inline-flex items-center gap-2 px-3 sm:px-space-md py-1.5 rounded-full bg-surface-container-high shadow-sm mb-5 sm:mb-6">
-                  <span className="relative flex h-2.5 w-2.5 shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary" />
-                  </span>
-                  <span className="text-[11px] sm:text-label-sm text-primary uppercase tracking-wider font-semibold">
-                    Monitoring IoT Perangkat Rumah Tangga
-                  </span>
-                </div>
-
-                <h1 className="text-[28px] leading-[36px] sm:text-4xl sm:leading-[44px] lg:text-[44px] lg:leading-[52px] font-bold text-on-surface tracking-tight mb-4 sm:mb-6">
-                  Kenali pemakaian listrik perangkatmu sebelum biaya membengkak
-                </h1>
-
-                <p className="text-sm sm:text-body-lg text-on-surface-variant max-w-xl mb-6 sm:mb-8 leading-relaxed">
-                  Pantau pemakaian tiap perangkat dengan alat IoT, dapat
-                  peringatan dini, lalu hemat tanpa menebak tagihan di akhir
-                  bulan.
-                </p>
-
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-space-md w-full sm:w-auto mb-6 sm:mb-8">
-                  <Link
-                    href="/daftar"
-                    className="inline-flex items-center justify-center gap-space-xs h-12 px-6 sm:px-7 rounded-xl bg-primary text-on-primary font-title-sm text-title-sm shadow-md hover:bg-primary-container transition-all hover:scale-[1.01] active:scale-[0.99]"
-                  >
-                    <span>Daftar Sekarang</span>
-                    <span className="material-symbols-outlined text-[20px]">
-                      arrow_forward
-                    </span>
-                  </Link>
-                  <Link
-                    href="/masuk"
-                    className="inline-flex items-center justify-center h-12 px-6 rounded-xl bg-surface-container-lowest text-on-surface font-title-sm text-title-sm shadow-sm border border-outline-variant/30 sm:border-transparent hover:bg-surface-container transition-colors"
-                  >
-                    <span>Masuk ke Akun</span>
-                  </Link>
-                </div>
-
-                {/* Micro-trust Signals */}
-                <div className="flex flex-wrap items-center gap-y-2 gap-x-3 sm:gap-x-4 text-on-surface-variant text-xs sm:text-label-md">
-                  <div className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-primary text-[16px] sm:text-[18px]">
-                      verified
-                    </span>
-                    <span>Tanpa langganan bulanan</span>
-                  </div>
-                  <span className="hidden sm:inline text-outline-variant font-bold">
-                    •
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-primary text-[16px] sm:text-[18px]">
-                      speed
-                    </span>
-                    <span>Update otomatis tiap 30 detik</span>
-                  </div>
-                  <span className="hidden sm:inline text-outline-variant font-bold">
-                    •
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-primary text-[16px] sm:text-[18px]">
-                      shield
-                    </span>
-                    <span>Kapasitas beban hingga 600 W</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: Interactive Live Dashboard Preview */}
-              <div className="lg:col-span-6 w-full">
-                <div className="relative bg-surface-container-lowest rounded-2xl p-4 sm:p-6 lg:p-7 shadow-xl shadow-on-surface/5 border border-outline-variant/20 flex flex-col gap-4 sm:gap-5">
-                  {/* Card Header Bar */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 pb-1 sm:pb-2">
-                    <div className="flex items-center gap-2.5 sm:gap-3">
-                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                        <span className="material-symbols-outlined text-[20px] sm:text-[22px]">
-                          developer_board
-                        </span>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm sm:text-title-sm text-on-surface font-semibold">
-                          Pratinjau Dashboard
-                        </span>
-                        <span className="text-[11px] sm:text-label-md text-on-surface-variant">
-                          ESP32 Power Monitor • Contoh Data
-                        </span>
-                      </div>
-                    </div>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-surface-container text-on-surface text-[11px] sm:text-label-sm font-semibold">
-                      <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                      <span>3 Alat Terhubung</span>
-                    </div>
-                  </div>
-
-                  {/* Dual Metrics Display Cards */}
-                  <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3 sm:gap-4">
-                    {/* Daya Aktif (Terukur) */}
-                    <div className="bg-surface-container-low rounded-xl p-3.5 sm:p-4 flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-1 mb-2">
-                        <span className="text-xs sm:text-label-md text-on-surface-variant font-medium">
-                          Daya Aktif
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-primary text-[10px] sm:text-label-sm font-semibold">
-                          Terukur
-                        </span>
-                      </div>
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-2xl sm:text-[32px] leading-tight font-bold text-on-surface">
-                          106
-                        </span>
-                        <span className="text-sm sm:text-title-sm text-on-surface-variant font-semibold">
-                          Watt
-                        </span>
-                      </div>
-                      <span className="text-[11px] sm:text-label-sm text-primary mt-1.5 flex items-center gap-0.5">
-                        <span className="material-symbols-outlined text-[14px]">
-                          bolt
-                        </span>
-                        Tegangan stabil 224 V
-                      </span>
-                    </div>
-
-                    {/* Estimasi Biaya Perangkat Terpantau */}
-                    <div className="bg-surface-container-low rounded-xl p-3.5 sm:p-4 flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-1 mb-2">
-                        <span className="text-xs sm:text-label-md text-on-surface-variant font-medium">
-                          Estimasi Biaya
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant text-[10px] sm:text-label-sm font-semibold">
-                          Bulan Ini
-                        </span>
-                      </div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-2xl sm:text-[26px] lg:text-[28px] leading-tight font-bold text-on-surface">
-                          Rp 27.675
-                        </span>
-                      </div>
-                      <span className="text-[11px] sm:text-label-sm text-on-surface-variant mt-1.5 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">
-                          query_stats
-                        </span>
-                        18,45 kWh terpantau
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Live Appliance Breakdown */}
-                  <div className="flex flex-col gap-2.5 sm:gap-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm sm:text-title-sm text-on-surface font-semibold">
-                        Beban Perangkat Aktif
-                      </span>
-                      <span className="text-[11px] sm:text-label-md text-on-surface-variant">
-                        Batas Sensor: 600 W
-                      </span>
-                    </div>
-
-                    {/* Device 1 */}
-                    <div className="p-3 sm:p-3.5 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse shrink-0" />
-                          <span className="text-sm sm:text-title-sm text-on-surface font-semibold truncate">
-                            Kipas Angin
-                          </span>
-                          <span className="font-label-md text-label-md text-on-surface-variant hidden sm:inline">
-                            (Kamar Utama)
-                          </span>
-                        </div>
-                        <div className="flex items-baseline gap-1 shrink-0">
-                          <span className="text-sm sm:text-title-sm font-bold text-on-surface">
-                            48 W
-                          </span>
-                          <span className="text-[11px] sm:text-label-sm text-on-surface-variant font-medium">
-                            / 45,3%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="w-full bg-surface-container-highest rounded-full h-2 overflow-hidden">
-                        <div
-                          className="bg-primary h-2 rounded-full transition-all duration-500"
-                          style={{ width: "45.3%" }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Device 2 */}
-                    <div className="p-3 sm:p-3.5 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-2.5 h-2.5 rounded-full bg-primary shrink-0" />
-                          <span className="text-sm sm:text-title-sm text-on-surface font-semibold truncate">
-                            Lampu Meja
-                          </span>
-                          <span className="font-label-md text-label-md text-on-surface-variant hidden sm:inline">
-                            (Ruang Kerja)
-                          </span>
-                        </div>
-                        <div className="flex items-baseline gap-1 shrink-0">
-                          <span className="text-sm sm:text-title-sm font-bold text-on-surface">
-                            58 W
-                          </span>
-                          <span className="text-[11px] sm:text-label-sm text-on-surface-variant font-medium">
-                            / 54,7%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="w-full bg-surface-container-highest rounded-full h-2 overflow-hidden">
-                        <div
-                          className="bg-primary h-2 rounded-full transition-all duration-500"
-                          style={{ width: "54.7%" }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Device 3 */}
-                    <div className="p-3 sm:p-3.5 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-2.5 h-2.5 rounded-full bg-outline-variant shrink-0" />
-                          <span className="text-sm sm:text-title-sm text-on-surface font-semibold truncate">
-                            Teko Listrik
-                          </span>
-                          <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant text-[10px] sm:text-label-sm font-semibold shrink-0">
-                            Standby
-                          </span>
-                        </div>
-                        <div className="flex items-baseline gap-1 shrink-0">
-                          <span className="text-sm sm:text-title-sm font-bold text-on-surface-variant">
-                            0 W
-                          </span>
-                          <span className="text-[11px] sm:text-label-sm text-on-surface-variant font-medium">
-                            / 0%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="w-full bg-surface-container-highest rounded-full h-2 overflow-hidden">
-                        <div
-                          className="bg-outline-variant/40 h-2 rounded-full"
-                          style={{ width: "1.5%" }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Warning Banner */}
-                  <div className="flex items-start gap-2.5 sm:gap-3 p-3 sm:p-3.5 rounded-xl bg-tertiary-fixed text-on-tertiary-fixed shadow-sm">
-                    <span
-                      className="material-symbols-outlined text-tertiary text-[20px] mt-0.5 shrink-0"
-                      style={{ fontVariationSettings: "'FILL' 1" }}
-                    >
-                      warning
-                    </span>
-                    <div className="flex flex-col text-on-tertiary-fixed">
-                      <span className="text-[11px] sm:text-label-sm font-bold tracking-tight uppercase">
-                        Peringatan Dini
-                      </span>
-                      <p className="text-xs sm:text-label-md mt-0.5 leading-relaxed">
-                        Kipas Angin menyala mendekati batas 8 jam/hari dan
-                        berpotensi melewati target hemat.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* 2. Clarification / Scope Note Banner (Batas Klaim PRD) */}
-          <section
-            id="fitur"
-            className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-2 sm:py-4"
-          >
-            <div className="w-full p-4 lg:p-5 rounded-2xl bg-surface-container-low shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div className="flex items-start sm:items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-secondary/10 flex items-center justify-center text-secondary shrink-0 mt-0.5 sm:mt-0">
-                  <span className="material-symbols-outlined text-[20px]">
-                    info
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm sm:text-title-sm font-semibold text-on-surface">
-                    Transparansi Pengukuran Perangkat Terpantau
-                  </span>
-                  <span className="text-xs sm:text-body-md text-on-surface-variant mt-0.5 leading-relaxed">
-                    Aplikasi hanya mengukur perangkat yang dipasangi modul IoT,
-                    bukan total beban seluruh meteran PLN rumah.
-                  </span>
-                </div>
-              </div>
-              <div className="inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-surface-container text-on-secondary-container text-xs sm:text-label-md font-semibold">
-                <span className="material-symbols-outlined text-[16px] text-secondary shrink-0">
-                  power
-                </span>
-                <span>Prinsip 1 Alat = 1 Perangkat IoT</span>
-              </div>
-            </div>
-          </section>
-
-          {/* 3. 3-Step Section: '3 Langkah Menuju Hemat' */}
-          <section
-            id="cara-kerja"
-            className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-12 sm:py-16"
-          >
-            <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-14">
-              <div className="inline-block px-3 py-1 rounded-full bg-surface-container-high text-primary text-[11px] sm:text-label-sm font-semibold uppercase tracking-wider mb-3">
-                Alur Kerja Sederhana
-              </div>
-              <h2 className="text-2xl sm:text-headline-lg lg:text-[32px] lg:leading-[40px] font-bold text-on-surface mb-3">
-                3 Langkah Menuju Hemat
-              </h2>
-              <p className="text-sm sm:text-body-lg text-on-surface-variant">
-                Cara cerdas mengontrol beban listrik dari perangkat favorit Anda
-                tanpa mengubah rutinitas keluarga.
-              </p>
+      {/* MAIN CONTAINER */}
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-12 py-8 sm:py-10 lg:py-14 flex flex-col gap-12 sm:gap-14 lg:gap-16">
+        {/* 2. HERO SECTION (Split 2-Column Layout) */}
+        <section id="pratinjau" className="scroll-mt-24 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center" >
+          {/* Left Column: Copy & CTAs */}
+          <div className="lg:col-span-6 flex flex-col items-start gap-5">
+            {/* Pill Badge */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary-fixed border border-primary-fixed-dim text-primary text-xs font-bold tracking-wide uppercase">
+              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              PEMANTAU LISTRIK PERANGKAT IOT
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-8">
-              {/* Card 1: Pantau */}
-              <div className="group bg-surface-container-lowest rounded-2xl p-5 sm:p-7 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-5 sm:mb-6">
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <span className="material-symbols-outlined text-[24px] sm:text-[26px]">
-                        insights
-                      </span>
-                    </div>
-                    <span className="text-[11px] sm:text-label-sm uppercase font-bold tracking-wider text-outline">
-                      Tahap 01
-                    </span>
-                  </div>
-                  <h3 className="text-lg sm:text-headline-md text-on-surface font-semibold mb-2 sm:mb-3">
-                    Langkah 1 • Pantau
-                  </h3>
-                  <p className="text-sm sm:text-body-md text-on-surface-variant leading-relaxed">
-                    Pantau daya watt dan konsumsi kWh tiap perangkat elektronik
-                    secara real-time dari modul IoT langsung di layar Anda.
-                  </p>
-                </div>
-                <div className="mt-5 sm:mt-6 pt-4 sm:pt-5 border-t border-outline-variant/20 flex items-center gap-2 text-primary">
-                  <span className="text-xs sm:text-label-md font-semibold">
-                    Sensor Terkalibrasi Otomatis
-                  </span>
-                  <span className="material-symbols-outlined text-[16px]">
-                    check_circle
-                  </span>
-                </div>
-              </div>
+            {/* Headline */}
+            <h1 className="font-extrabold text-3xl sm:text-4xl lg:text-[44px] leading-[1.18] tracking-tight text-on-primary-fixed-variant">
+              Kenali pemakaian listrik perangkatmu sebelum biaya membengkak
+            </h1>
 
-              {/* Card 2: Ingatkan */}
-              <div className="group bg-surface-container-lowest rounded-2xl p-5 sm:p-7 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-5 sm:mb-6">
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-tertiary-container/15 text-tertiary flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <span
-                        className="material-symbols-outlined text-[24px] sm:text-[26px]"
-                        style={{ fontVariationSettings: "'FILL' 1" }}
-                      >
-                        notifications_active
-                      </span>
-                    </div>
-                    <span className="text-[11px] sm:text-label-sm uppercase font-bold tracking-wider text-outline">
-                      Tahap 02
-                    </span>
-                  </div>
-                  <h3 className="text-lg sm:text-headline-md text-on-surface font-semibold mb-2 sm:mb-3">
-                    Langkah 2 • Ingatkan
-                  </h3>
-                  <p className="text-sm sm:text-body-md text-on-surface-variant leading-relaxed">
-                    Dapatkan notifikasi in-app otomatis saat durasi nyala
-                    berlebih atau estimasi biaya mendekati ambang batas yang
-                    ditentukan.
-                  </p>
-                </div>
-                <div className="mt-5 sm:mt-6 pt-4 sm:pt-5 border-t border-outline-variant/20 flex items-center gap-2 text-tertiary">
-                  <span className="text-xs sm:text-label-md font-semibold">
-                    Peringatan Durasi &amp; Ambang Biaya
-                  </span>
-                  <span className="material-symbols-outlined text-[16px]">
-                    check_circle
-                  </span>
-                </div>
-              </div>
+            {/* Subtitle */}
+            <p className="text-base sm:text-lg text-on-surface-variant leading-relaxed">
+              Pantau pemakaian tiap perangkat dengan alat IoT, dapat peringatan
+              dini, lalu hemat tanpa menebak tagihan di akhir bulan.
+            </p>
 
-              {/* Card 3: Hemat */}
-              <div className="group bg-surface-container-lowest rounded-2xl p-5 sm:p-7 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-5 sm:mb-6">
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center group-hover:scale-105 transition-transform">
-                      <span
-                        className="material-symbols-outlined text-[24px] sm:text-[26px]"
-                        style={{ fontVariationSettings: "'FILL' 1" }}
-                      >
-                        electric_bolt
-                      </span>
-                    </div>
-                    <span className="text-[11px] sm:text-label-sm uppercase font-bold tracking-wider text-outline">
-                      Tahap 03
-                    </span>
-                  </div>
-                  <h3 className="text-lg sm:text-headline-md text-on-surface font-semibold mb-2 sm:mb-3">
-                    Langkah 3 • Hemat
-                  </h3>
-                  <p className="text-sm sm:text-body-md text-on-surface-variant leading-relaxed">
-                    Bandingkan pemakaian antar-periode, simulasikan pengurangan
-                    jam nyala, dan pasang target penghematan bulanan secara
-                    terukur.
-                  </p>
-                </div>
-                <div className="mt-5 sm:mt-6 pt-4 sm:pt-5 border-t border-outline-variant/20 flex items-center gap-2 text-secondary">
-                  <span className="text-xs sm:text-label-md font-semibold">
-                    Kalkulator Simulasi Biaya
-                  </span>
-                  <span className="material-symbols-outlined text-[16px]">
-                    check_circle
-                  </span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* 4. Visual Proof Showcase / Appliance Gallery */}
-          <section
-            id="instalasi"
-            className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-6 sm:py-10"
-          >
-            <div className="bg-surface-container-low rounded-2xl sm:rounded-3xl p-5 sm:p-8 lg:p-12 shadow-sm grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center">
-              <div className="lg:col-span-5 flex flex-col">
-                <span className="text-[11px] sm:text-label-sm text-primary uppercase font-bold tracking-wider mb-2">
-                  Instalasi Plug-and-Play
-                </span>
-                <h3 className="text-xl sm:text-headline-lg lg:text-[28px] font-bold text-on-surface mb-3 sm:mb-4">
-                  Cukup tancapkan ke stopkontak rumah Anda
-                </h3>
-                <p className="text-sm sm:text-body-md text-on-surface-variant mb-5 sm:mb-6 leading-relaxed">
-                  Tidak perlu membongkar kabel instalasi utama rumah. Cukup
-                  hubungkan perangkat elektronik ke stopkontak modul IoT dan
-                  sambungkan ke Wi-Fi dalam hitungan menit.
-                </p>
-                <div className="space-y-3">
-                  <div className="flex items-start sm:items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-label-sm shrink-0 mt-0.5 sm:mt-0">
-                      ✓
-                    </span>
-                    <span className="text-sm sm:text-body-md text-on-surface">
-                      Kotak tertutup berisolasi &amp; pengaman sekering
-                    </span>
-                  </div>
-                  <div className="flex items-start sm:items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-label-sm shrink-0 mt-0.5 sm:mt-0">
-                      ✓
-                    </span>
-                    <span className="text-sm sm:text-body-md text-on-surface">
-                      Mendukung kapasitas beban perangkat hingga 600 Watt
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="relative overflow-hidden rounded-2xl h-48 sm:h-56 shadow-sm">
-                  <img
-                    className="w-full h-full object-cover"
-                    alt="Sudut ruang keluarga dengan adaptor smart plug terpasang pada stopkontak dinding"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDeeab0ud75dmzOi32BuF-2hfMn5ffEX1nXmkAxLG9ZtDpzjPtFCuCvXpsh0t00JQ8BUSZmsdVPuC1BwpFN6xos2WDkAc43MCkUKAcj1W6imh85r7_25lzGe8LkovfvIHxvvbmCpafr-yXqq6QPPGnw5KEwlHDLGAJIxQYGXHtlMAWv6a8DSlad7Zg4Cmi-eLky8K6kgMmhVQ9sgZSrkd2OAG726cWKh9JUI35lzsX3"
-                  />
-                  <div className="absolute bottom-3 left-3 bg-surface-container-lowest/90 backdrop-blur-md px-3 py-1.5 rounded-lg text-on-surface text-[11px] sm:text-label-sm font-semibold shadow-sm">
-                    Ruang Keluarga
-                  </div>
-                </div>
-
-                <div className="relative overflow-hidden rounded-2xl h-48 sm:h-56 shadow-sm">
-                  <img
-                    className="w-full h-full object-cover"
-                    alt="Modul pemantau energi IoT terpasang pada meja ruang kerja"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKrQhZ9Hj8Jwc610EcMMGHGT-bY9lMfgwC6CJrczCaupU8FxH-S0XPzas-50NA5csResk53IxqikLj0K5mPxysmmC8Tz2uY4_jbUZ4dSOEeky6Evcv7GeVbRsaaKTjkRSmn669tzijvBUd2i_khhqfMHNbjmTOe0wky0aShAXEUiHSR219CciRt5TdBzr0g39wu8yEwbyBbsEW-vatyeq_hLsmGJw0vE0_H4Iw04cU"
-                  />
-                  <div className="absolute bottom-3 left-3 bg-surface-container-lowest/90 backdrop-blur-md px-3 py-1.5 rounded-lg text-on-surface text-[11px] sm:text-label-sm font-semibold shadow-sm">
-                    Ruang Kerja &amp; Kamar
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* 5. Bottom Conversion CTA Section */}
-          <section
-            id="mulai"
-            className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-10 sm:py-14"
-          >
-            <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-primary text-on-primary p-6 sm:p-10 lg:p-14 shadow-xl">
-              <div className="absolute -right-16 -top-16 w-80 h-80 rounded-full bg-primary-fixed/10 pointer-events-none blur-2xl" />
-              <div className="absolute -left-16 -bottom-16 w-80 h-80 rounded-full bg-on-primary/10 pointer-events-none blur-2xl" />
-
-              <div className="relative z-10 flex flex-col items-center text-center max-w-3xl mx-auto">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-surface-container-lowest/15 backdrop-blur-sm text-on-primary flex items-center justify-center mb-5 sm:mb-6">
-                  <span className="material-symbols-outlined text-[28px] sm:text-[32px]">
-                    power
-                  </span>
-                </div>
-
-                <h2 className="text-2xl sm:text-3xl lg:text-[36px] lg:leading-[44px] font-bold text-on-primary tracking-tight mb-3 sm:mb-4">
-                  Mulai Kendalikan Beban Listrik
-                </h2>
-
-                <p className="text-sm sm:text-body-lg text-on-primary/90 max-w-xl mb-6 sm:mb-8 leading-relaxed">
-                  Hubungkan perangkat pertamamu ke modul IoT dalam hitungan
-                  menit dan pantau estimasi biayanya secara transparan.
-                </p>
-
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-4 w-full sm:w-auto mb-5 sm:mb-6">
-                  <Link
-                    href="/daftar"
-                    className="inline-flex items-center justify-center gap-2 h-12 px-6 sm:px-8 rounded-xl bg-surface-container-lowest text-primary font-title-sm text-title-sm font-bold shadow-lg hover:bg-surface-container hover:scale-[1.02] active:scale-[0.98] transition-all"
-                  >
-                    <span>Buat Akun Gratis Sekarang</span>
-                    <span className="material-symbols-outlined text-[20px]">
-                      arrow_forward
-                    </span>
-                  </Link>
-                </div>
-
-                <p className="text-xs sm:text-label-md text-on-primary/80 flex items-center justify-center gap-1.5">
-                  <span className="material-symbols-outlined text-[16px] shrink-0">
-                    wifi
-                  </span>
-                  <span>
-                    Dapat digunakan langsung dengan jaringan Wi-Fi 2.4 GHz rumah
-                    Anda.
-                  </span>
-                </p>
-              </div>
-            </div>
-          </section>
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="w-full bg-surface-container-low border-t border-outline-variant/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-8 sm:py-space-xl">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-6 sm:pb-space-lg">
-            <div className="flex items-center gap-space-sm">
-              <div className="w-8 h-8 rounded-lg bg-primary-container flex items-center justify-center text-on-primary-container">
-                <span className="material-symbols-outlined text-[18px]">
-                  bolt
-                </span>
-              </div>
-              <span className="font-title-sm text-title-sm text-on-surface">
-                Smart Tracker Listrik IoT
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-              <a
-                href="#fitur"
-                className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors"
+            {/* CTA Buttons Row */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 pt-1 w-full sm:w-auto">
+              <Link
+                href="/daftar"
+                className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-primary hover:bg-on-primary-fixed-variant text-on-primary font-bold text-base shadow-sm transition-colors flex items-center justify-center gap-2"
               >
-                Fitur
-              </a>
-              <a
-                href="#cara-kerja"
-                className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors"
-              >
-                Cara Kerja
-              </a>
-              <a
-                href="#instalasi"
-                className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors"
-              >
-                Perangkat
-              </a>
+                <span>Daftar Sekarang</span>
+                <span className="material-symbols-outlined text-[20px]">
+                  arrow_forward
+                </span>
+              </Link>
               <Link
                 href="/masuk"
-                className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors"
+                className="w-full sm:w-auto px-7 py-3.5 rounded-xl border border-outline-variant bg-surface-container-lowest hover:bg-surface-container text-on-surface font-bold text-base transition-colors flex items-center justify-center"
               >
-                Masuk Akun
+                Masuk ke Akun
               </Link>
             </div>
 
-            <div className="inline-flex items-center gap-space-xs px-3.5 sm:px-space-md py-1.5 rounded-full bg-surface-container-highest">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              <span className="text-[11px] sm:text-label-sm text-on-surface font-semibold">
-                IoT Real-Time Monitoring Aktif
+            {/* Trust Points Row (Selaras PRD v1.2) */}
+            <div className="pt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-on-surface-variant">
+              <span className="flex items-center gap-1.5 font-semibold text-on-surface">
+                <span className="text-primary">✓</span> Tanpa langganan bulanan
+              </span>
+              <span className="text-outline-variant hidden sm:inline">•</span>
+              <span className="flex items-center gap-1.5 font-semibold text-on-surface">
+                <span className="text-primary">✓</span> Update otomatis tiap 30
+                detik
+              </span>
+              <span className="text-outline-variant hidden sm:inline">•</span>
+              <span className="flex items-center gap-1.5 font-semibold text-on-surface">
+                <span className="text-primary">✓</span> Batas beban aman ≤ 600 W
               </span>
             </div>
           </div>
 
-          <div className="pt-4 sm:pt-space-md border-t border-outline-variant/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-on-surface-variant text-center sm:text-left">
-            <p className="text-xs sm:text-label-md">
-              © 2026 Smart Tracker Listrik IoT. Seluruh hak cipta dilindungi.
-            </p>
-            <div className="flex items-center gap-space-md">
-              <span className="text-xs sm:text-label-md">Privasi</span>
-              <span className="text-xs sm:text-label-md">
-                Syarat &amp; Ketentuan
+          {/* Right Column: Floating Dashboard Preview Card */}
+          <div className="lg:col-span-6 flex justify-center w-full">
+            <div className="w-full max-w-lg bg-surface-container-lowest rounded-2xl border border-outline-variant p-5 sm:p-6 shadow-md shadow-stone-900/5 flex flex-col gap-5">
+              {/* Card Header */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-outline-variant">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-primary-fixed text-primary flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[20px]">
+                      grid_view
+                    </span>
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-base text-on-surface leading-tight">
+                      Pratinjau Dashboard
+                    </h2>
+                    <span className="text-xs text-on-surface-variant">
+                      ESP32 + PZEM-004T 10A • Contoh Data
+                    </span>
+                  </div>
+                </div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-fixed text-primary text-xs font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary" />3 Alat
+                  Terhubung
+                </span>
+              </div>
+
+              {/* Top Metric Cards Side-by-Side */}
+              <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3.5">
+                {/* Left Metric: Daya Aktif (Terukur) */}
+                <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs text-on-surface-variant mb-1">
+                    <span className="font-medium">Daya Aktif</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary-fixed text-primary font-bold">
+                      Terukur
+                    </span>
+                  </div>
+                  <div className="my-1">
+                    <span className="font-extrabold text-2xl lg:text-[28px] text-on-primary-fixed-variant">
+                      106
+                    </span>
+                    <span className="text-xs font-bold text-on-surface-variant ml-1">
+                      Watt
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-on-surface-variant flex items-center gap-1 pt-1.5 border-t border-outline-variant/70">
+                    <span className="text-primary font-bold">⚡</span> Tegangan
+                    stabil 224 V
+                  </div>
+                </div>
+
+                {/* Right Metric: Estimasi Biaya */}
+                <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-xs text-on-surface-variant mb-1">
+                    <span className="font-medium">Estimasi Biaya</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-container text-on-surface font-bold">
+                      Bulan Ini
+                    </span>
+                  </div>
+                  <div className="my-1">
+                    <span className="font-extrabold text-2xl lg:text-[26px] text-on-primary-fixed-variant">
+                      Rp 27.675
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-on-surface-variant flex items-center gap-1 pt-1.5 border-t border-outline-variant/70">
+                    <span className="material-symbols-outlined text-[14px] text-primary">
+                      trending_up
+                    </span>
+                    18,45 kWh terpantau
+                  </div>
+                </div>
+              </div>
+
+              {/* Device Load List */}
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-center justify-between text-xs font-bold text-on-surface px-0.5">
+                  <span>Beban Perangkat Aktif</span>
+                  <span className="text-on-surface-variant font-medium text-[11px]">
+                    Batas Uji: 600 W
+                  </span>
+                </div>
+
+                {/* Item 1: Kipas Angin */}
+                <div className="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
+                      <span className="font-bold text-on-surface truncate">
+                        Kipas Angin
+                      </span>
+                      <span className="text-on-surface-variant text-[11px] hidden sm:inline">
+                        (Alat 1)
+                      </span>
+                    </div>
+                    <div className="font-semibold text-on-surface shrink-0">
+                      <span className="font-bold text-on-primary-fixed-variant">
+                        48 W
+                      </span>
+                      <span className="text-on-surface-variant text-[11px] ml-1">
+                        / 45,3% daya aktif
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-surface-container overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full"
+                      style={{ width: "45.3%" }}
+                    />
+                  </div>
+                </div>
+
+                {/* Item 2: Lampu Meja */}
+                <div className="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
+                      <span className="font-bold text-on-surface truncate">
+                        Lampu Meja
+                      </span>
+                      <span className="text-on-surface-variant text-[11px] hidden sm:inline">
+                        (Alat 2)
+                      </span>
+                    </div>
+                    <div className="font-semibold text-on-surface shrink-0">
+                      <span className="font-bold text-on-primary-fixed-variant">
+                        58 W
+                      </span>
+                      <span className="text-on-surface-variant text-[11px] ml-1">
+                        / 54,7% daya aktif
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-surface-container overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full"
+                      style={{ width: "54.7%" }}
+                    />
+                  </div>
+                </div>
+
+                {/* Item 3: Teko Listrik */}
+                <div className="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant flex items-center justify-between text-xs gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-outline-variant shrink-0" />
+                    <span className="font-bold text-on-surface truncate">
+                      Teko Listrik
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-bold shrink-0">
+                      Standby
+                    </span>
+                  </div>
+                  <div className="font-semibold text-on-surface-variant shrink-0">
+                    <span>0 W</span>
+                    <span className="text-[11px] ml-1">/ 0% daya aktif</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Warning Banner at bottom of card */}
+              <div className="p-3 rounded-xl bg-tertiary-fixed border border-tertiary-fixed-dim flex items-start gap-2.5">
+                <span className="material-symbols-outlined text-[18px] text-on-tertiary-fixed-variant shrink-0 mt-0.5">
+                  warning
+                </span>
+                <p className="text-xs text-on-tertiary-fixed-variant leading-snug">
+                  <strong className="font-bold tracking-wide uppercase text-[10px] block mb-0.5">
+                    PERINGATAN DINI
+                  </strong>
+                  Kipas Angin menyala mendekati batas 8 jam/hari dan berpotensi
+                  melewati ambang biaya.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 3. INFO / PRINCIPLE BANNER (Batas Klaim PRD v1.2) */}
+        <section
+          id="prinsip"
+          className="scroll-mt-24 w-full p-4 sm:p-5 rounded-2xl bg-surface-container-lowest border border-outline-variant flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs"
+        >
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary-fixed text-primary flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+              <span className="material-symbols-outlined text-[20px]">
+                info
               </span>
+            </div>
+            <div>
+              <h2 className="font-bold text-sm text-on-surface">
+                Transparansi Pengukuran Perangkat Terpantau
+              </h2>
+              <p className="text-xs sm:text-sm text-on-surface-variant mt-0.5">
+                Aplikasi hanya mengukur perangkat yang dipasangi modul IoT,
+                bukan total beban seluruh meteran listrik PLN rumah.
+              </p>
+            </div>
+          </div>
+          <div className="px-3.5 py-1.5 rounded-full bg-surface-container border border-outline-variant text-on-primary-fixed-variant text-xs font-bold tracking-wide shrink-0 flex items-center gap-1.5">
+            <span>⚡</span> Prinsip 1 Alat = 1 Perangkat IoT
+          </div>
+        </section>
+
+        {/* 4. "3 LANGKAH MENUJU HEMAT" SECTION */}
+        <section
+          id="cara-kerja"
+          className="scroll-mt-24 flex flex-col items-center text-center pt-2"
+        >
+          <div className="inline-flex items-center px-3.5 py-1 rounded-full bg-surface-container border border-outline-variant text-on-surface text-xs font-bold tracking-wider uppercase mb-3">
+            ALUR KERJA SEDERHANA
+          </div>
+          <h2 className="font-extrabold text-2xl sm:text-3xl lg:text-4xl text-on-primary-fixed-variant">
+            3 Langkah Menuju Hemat
+          </h2>
+          <p className="text-on-surface-variant text-sm sm:text-base max-w-2xl mt-2 mb-8 sm:mb-10">
+            Cara mudah mengontrol beban listrik dari perangkat sehari-hari tanpa
+            mengubah rutinitas keluarga.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6 w-full text-left">
+            {/* Step 1 */}
+            <div className="p-6 rounded-2xl bg-surface-container-lowest border border-outline-variant hover:border-primary/50 transition-colors flex flex-col justify-between gap-6">
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-xl bg-primary-fixed text-primary flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[26px]">
+                      show_chart
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold tracking-widest text-on-surface-variant uppercase">
+                    TAHAP 01
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg text-on-surface mb-2">
+                    Langkah 1 • Pantau
+                  </h3>
+                  <p className="text-on-surface-variant text-xs sm:text-sm leading-relaxed">
+                    Pantau daya Watt dan konsumsi kWh tiap perangkat elektronik
+                    secara otomatis dari modul ESP32 &amp; PZEM-004T langsung di
+                    layar Anda.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-outline-variant flex items-center gap-1.5 text-xs font-semibold text-primary">
+                <span>Pembacaan Digital Terukur</span>
+                <span>✓</span>
+              </div>
+            </div>
+
+            {/* Step 2 */}
+            <div className="p-6 rounded-2xl bg-surface-container-lowest border border-outline-variant hover:border-primary/50 transition-colors flex flex-col justify-between gap-6">
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-xl bg-tertiary-fixed text-on-tertiary-fixed-variant flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[26px]">
+                      notifications_active
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold tracking-widest text-on-surface-variant uppercase">
+                    TAHAP 02
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg text-on-surface mb-2">
+                    Langkah 2 • Ingatkan
+                  </h3>
+                  <p className="text-on-surface-variant text-xs sm:text-sm leading-relaxed">
+                    Dapatkan notifikasi di dalam aplikasi saat durasi nyala
+                    berlebih atau estimasi biaya mendekati ambang batas yang
+                    Anda tentukan.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-outline-variant flex items-center gap-1.5 text-xs font-semibold text-on-tertiary-fixed-variant">
+                <span>Peringatan Durasi &amp; Batas Biaya</span>
+                <span>✓</span>
+              </div>
+            </div>
+
+            {/* Step 3 */}
+            <div className="p-6 rounded-2xl bg-surface-container-lowest border border-outline-variant hover:border-primary/50 transition-colors flex flex-col justify-between gap-6">
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-xl bg-primary-fixed text-primary flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[26px]">
+                      bolt
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold tracking-widest text-on-surface-variant uppercase">
+                    TAHAP 03
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg text-on-surface mb-2">
+                    Langkah 3 • Hemat
+                  </h3>
+                  <p className="text-on-surface-variant text-xs sm:text-sm leading-relaxed">
+                    Bandingkan pemakaian antar-periode, simulasikan pengurangan
+                    jam nyala perangkat, dan tetapkan target hemat bulanan.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-outline-variant flex items-center gap-1.5 text-xs font-semibold text-primary">
+                <span>Kalkulator Simulasi Biaya</span>
+                <span>✓</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 5. "CUKUP TANCAPKAN KE STOPKONTAK" SHOWCASE SECTION */}
+        <section
+          id="perangkat"
+          className="scroll-mt-24 p-6 lg:p-10 rounded-3xl bg-surface-container-low border border-outline-variant"
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+            {/* Left Side */}
+            <div className="lg:col-span-5 flex flex-col items-start gap-4">
+              <span className="text-xs font-bold tracking-wider text-primary uppercase">
+                INSTALASI COLOKAN PERANTARA
+              </span>
+              <h2 className="font-extrabold text-2xl sm:text-3xl text-on-primary-fixed-variant leading-tight">
+                Cukup tancapkan ke stopkontak rumah Anda
+              </h2>
+              <p className="text-on-surface-variant text-xs sm:text-sm leading-relaxed">
+                Tidak perlu membongkar kabel instalasi utama rumah. Cukup
+                hubungkan perangkat elektronik (seperti kipas angin, lampu meja,
+                atau teko listrik) ke stopkontak kotak modul ESP32 + PZEM-004T
+                dan sambungkan ke Wi-Fi.
+              </p>
+              <div className="pt-2 flex flex-col gap-2.5 text-xs sm:text-sm font-semibold text-on-surface">
+                <div className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-primary-fixed text-primary flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                    ✓
+                  </span>
+                  <span>
+                    Kotak tertutup berisolasi dengan pemisahan zona AC &amp; DC
+                  </span>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-primary-fixed text-primary flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                    ✓
+                  </span>
+                  <span>
+                    Sensor PZEM-004T 10A dengan batas beban uji aman ≤ 600 W
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Side: Photographic domestic cards */}
+            <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Card 1: Ruang Keluarga */}
+              <div className="relative rounded-2xl overflow-hidden border border-outline-variant group bg-surface-container aspect-4/3 sm:aspect-square flex items-end p-4 shadow-xs">
+                <img
+                  alt="Sudut ruang keluarga dengan stopkontak perangkat rumah tangga"
+                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBd_hB7B7ij_haU6Ewlj8MascVF5HsuHmffMubsaIfdFTdl-WB5Ty6neMi4xN7biQ_q84MLCOZhlEUQvfSfRamMbhu7QDy7EAklRAYrma0rkV-VkR6LpAsNC74xBQJ5K_SBEMQdg9jG_60hwx19I6ya5DSsRpQRwkEqDEt1pfQBmIStajn0Nt_72GuOY3-77exqOK-JDt8G3rmLPFvac4PNyVyte8RpUxqcHCdV3ro_"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                <span className="relative z-10 px-3.5 py-1.5 rounded-full bg-surface-container-lowest/95 backdrop-blur-sm text-on-surface font-bold text-xs shadow-xs">
+                  Ruang Keluarga
+                </span>
+              </div>
+
+              {/* Card 2: Ruang Kerja & Kamar */}
+              <div className="relative rounded-2xl overflow-hidden border border-outline-variant group bg-surface-container aspect-4/3 sm:aspect-square flex items-end p-4 shadow-xs">
+                <img
+                  alt="Meja ruang kerja dengan perangkat elektronik terpantau"
+                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuAY2mgW0mceVzravjQG4VZro-1fkdOlQ5pzD_w66mOvgRj3xwOjOXh1TpO_xzlTjvq3_Cot-YHZpaxHe7rt0y_INtnfwa2hdiA1RB4xshDPxC3Vncg-zSedkgOE09CkO5ug5ofdal2GMSPWdoeQLowA7eEkJ5l7RsZN7cZYn0UJchFXFGnN99d2WiE00KM4WXTkb-yJbGsC_-8Sp2g8D4qbyyOQEXSg_z34-0QVZcn3"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                <span className="relative z-10 px-3.5 py-1.5 rounded-full bg-surface-container-lowest/95 backdrop-blur-sm text-on-surface font-bold text-xs shadow-xs">
+                  Ruang Kerja &amp; Kamar
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 6. LARGE BOTTOM CTA CARD */}
+        <section
+          id="mulai"
+          className="scroll-mt-24 rounded-3xl bg-primary text-on-primary p-7 sm:p-12 lg:p-14 flex flex-col items-center text-center shadow-md"
+        >
+          <div className="w-14 h-14 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center text-on-primary mb-5 sm:mb-6">
+            <span className="material-symbols-outlined text-[30px]">power</span>
+          </div>
+
+          <h2 className="font-extrabold text-2xl sm:text-3xl lg:text-4xl max-w-2xl leading-tight text-on-primary mb-3">
+            Mulai Kendalikan Beban Listrik
+          </h2>
+
+          <p className="text-primary-fixed text-sm sm:text-base max-w-xl leading-relaxed mb-7 sm:mb-8">
+            Hubungkan perangkat pertamamu ke modul ESP32 + PZEM-004T dalam
+            hitungan menit dan pantau estimasi biayanya secara transparan.
+          </p>
+
+          <Link
+            href="/daftar"
+            className="px-7 sm:px-8 py-3.5 rounded-full bg-surface-container-lowest text-on-primary-fixed-variant font-bold text-sm sm:text-base hover:bg-surface transition-colors shadow-sm flex items-center gap-2"
+          >
+            <span>Buat Akun Gratis Sekarang</span>
+            <span className="material-symbols-outlined text-[20px]">
+              arrow_forward
+            </span>
+          </Link>
+
+          <div className="mt-6 flex items-center gap-1.5 text-xs text-primary-fixed/90">
+            <span className="material-symbols-outlined text-[16px]">wifi</span>
+            <span>
+              Dapat digunakan langsung dengan jaringan Wi-Fi 2.4 GHz rumah Anda.
+            </span>
+          </div>
+        </section>
+      </main>
+
+      {/* 7. FOOTER */}
+      <footer className="w-full bg-surface-container-lowest border-t border-outline-variant mt-8 py-8 sm:py-10 text-xs text-on-surface-variant">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 flex flex-col gap-6 sm:gap-8">
+          {/* Top Row */}
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 pb-6 border-b border-outline-variant">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-on-primary">
+                <span className="material-symbols-outlined text-[18px]">
+                  bolt
+                </span>
+              </div>
+              <span className="font-bold text-base text-on-primary-fixed-variant">
+                Smart Tracker Listrik IoT
+              </span>
+            </div>
+
+            <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-semibold text-on-surface">
+              <a
+                href="#prinsip"
+                className="hover:text-primary transition-colors"
+              >
+                Prinsip Kerja
+              </a>
+              <a
+                href="#cara-kerja"
+                className="hover:text-primary transition-colors"
+              >
+                Cara Kerja
+              </a>
+              <a
+                href="#perangkat"
+                className="hover:text-primary transition-colors"
+              >
+                Perangkat IoT
+              </a>
+              <Link
+                href="/masuk"
+                className="hover:text-primary transition-colors"
+              >
+                Masuk Akun
+              </Link>
+            </nav>
+
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-fixed text-primary text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              IoT Real-Time Monitoring Aktif
+            </div>
+          </div>
+
+          {/* Bottom Row */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px]">
+            <span>
+              © 2026 Smart Tracker Listrik IoT • Kelompok Hayuu. Seluruh hak
+              cipta dilindungi.
+            </span>
+            <div className="flex items-center gap-4">
+              <span>Privasi</span>
+              <span>•</span>
+              <span>Syarat &amp; Ketentuan</span>
             </div>
           </div>
         </div>
