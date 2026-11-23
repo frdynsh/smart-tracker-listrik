@@ -587,7 +587,7 @@ export default async function LandingPage() {
       <footer className="w-full bg-surface-container-lowest border-t border-outline-variant mt-8 py-8 sm:py-10 text-xs text-on-surface-variant">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 flex flex-col gap-6 sm:gap-8">
           {/* Top Row */}
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 pb-6 border-b border-outline-variant">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-5 pb-6 border-b border-outline-variant">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-on-primary">
                 <span className="material-symbols-outlined text-[18px]">
@@ -636,7 +636,7 @@ export default async function LandingPage() {
           </div>
 
           {/* Bottom Row */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px]">
+          <div className="flex flex-col text-center sm:flex-row items-center justify-between gap-3 text-[11px]">
             <span>
               © 2026 Smart Tracker Listrik IoT • Kelompok Hayuu. Seluruh hak
               cipta dilindungi.
