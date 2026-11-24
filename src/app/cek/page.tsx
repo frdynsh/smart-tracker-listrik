@@ -75,6 +75,7 @@ export default function CekPage() {
   const [tarif, setTarif] = useState<number>(1444.7);
   const [golongan, setGolongan] = useState<string>("R-1/TR 900 VA");
   const [batasAmanRp, setBatasAmanRp] = useState<number>(50000);
+  // null = default (tampilkan gabungan semua perangkat tanpa ada item "Semua Perangkat" di daftar)
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
 
   const [editingTarif, setEditingTarif] = useState<boolean>(false);
@@ -92,7 +93,6 @@ export default function CekPage() {
       return;
     }
 
-    // 1. Ambil profil tarif & ambang batas biaya bulanan
     const [{ data: profile }, { data: budgetRule }, { data: devsData }] =
       await Promise.all([
         supabase
@@ -128,7 +128,15 @@ export default function CekPage() {
     const devList = (devsData as DeviceRow[]) || [];
     setDevices(devList);
 
-    // 2. Rentang waktu untuk grafik & proporsi utama
+    if (devList.length === 0) {
+      setReadings([]);
+      setSevenDayReadings([]);
+      setLoading(false);
+      return;
+    }
+
+    const devIds = devList.map((d) => d.id);
+
     const startPeriod = new Date();
     if (period === "today") {
       startPeriod.setHours(0, 0, 0, 0);
@@ -140,7 +148,6 @@ export default function CekPage() {
       startPeriod.setHours(0, 0, 0, 0);
     }
 
-    // 3. Rentang 7 hari untuk mini chart rincian perangkat di kartu kanan bawah
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
     sevenDaysAgo.setHours(0, 0, 0, 0);
@@ -149,15 +156,17 @@ export default function CekPage() {
       supabase
         .from("readings")
         .select("id, device_id, ts, p, e_wh")
+        .in("device_id", devIds)
         .gte("ts", startPeriod.toISOString())
         .order("ts", { ascending: true })
-        .limit(1000),
+        .limit(10000),
       supabase
         .from("readings")
         .select("id, device_id, ts, p, e_wh")
+        .in("device_id", devIds)
         .gte("ts", sevenDaysAgo.toISOString())
         .order("ts", { ascending: true })
-        .limit(1000),
+        .limit(10000),
     ]);
 
     setReadings((periodReads as ReadingRow[]) || []);
@@ -219,7 +228,6 @@ export default function CekPage() {
     const sumKwh = rawItems.reduce((acc, item) => acc + item.kwh, 0);
     const sumBiaya = sumKwh * tarif;
 
-    // Normalisasi persentase agar selalu tepat 100.0% saat ada data
     let allocatedPct = 0;
     const sorted = [...rawItems].sort((a, b) => b.kwh - a.kwh);
     const enriched: DeviceBreakdown[] = sorted.map((item, idx) => {
@@ -237,7 +245,6 @@ export default function CekPage() {
       return { ...item, persen };
     });
 
-    // Estimasi proyeksi akhir bulan (30 hari)
     const todayDate = new Date().getDate();
     const elapsedDays =
       period === "today" ? 1 : period === "7d" ? 7 : Math.max(1, todayDate);
@@ -251,17 +258,13 @@ export default function CekPage() {
     };
   }, [devices, readings, tarif, period]);
 
-  // Perangkat fokus di kartu kanan bawah (default: perangkat paling boros)
+  // Perangkat fokus saat user mengklik salah satu alat (null = default gabungan semua)
   const focusedDevice = useMemo(() => {
-    if (breakdown.length === 0) return null;
-    if (selectedDeviceId) {
-      const found = breakdown.find((b) => b.id === selectedDeviceId);
-      if (found) return found;
-    }
-    return breakdown[0];
+    if (!selectedDeviceId || breakdown.length === 0) return null;
+    return breakdown.find((b) => b.id === selectedDeviceId) || null;
   }, [breakdown, selectedDeviceId]);
 
-  // Data 7 hari terakhir untuk mini bar chart perangkat terpilih
+  // Data 7 hari terakhir untuk mini bar chart (gabungan semua alat jika null, atau alat terpilih)
   const sevenDayStats = useMemo(() => {
     const days: {
       key: string;
@@ -289,16 +292,16 @@ export default function CekPage() {
       });
     }
 
-    if (!focusedDevice) {
+    if (breakdown.length === 0) {
       return { days, avgHours: 0, peakDay: null, savingEstimateRp: 0 };
     }
 
-    const devReads = sevenDayReadings.filter(
-      (r) => r.device_id === focusedDevice.id,
-    );
+    const targetReads = focusedDevice
+      ? sevenDayReadings.filter((r) => r.device_id === focusedDevice.id)
+      : sevenDayReadings;
 
     const byDay = new Map<string, ReadingRow[]>();
-    devReads.forEach((r) => {
+    targetReads.forEach((r) => {
       const dt = new Date(r.ts);
       const key = `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
       const list = byDay.get(key) || [];
@@ -309,20 +312,39 @@ export default function CekPage() {
     days.forEach((dayItem) => {
       const list = byDay.get(dayItem.key) || [];
       if (list.length > 0) {
-        const deltaWh =
-          list.length > 1
-            ? Math.max(
-                0,
-                Number(list[list.length - 1].e_wh) - Number(list[0].e_wh),
-              )
-            : Number(list[0].p) * 0.25;
-        const avgWatt =
-          list.reduce((sum, item) => sum + Number(item.p), 0) / list.length;
+        const perDev = new Map<string, ReadingRow[]>();
+        list.forEach((r) => {
+          const arr = perDev.get(r.device_id) || [];
+          arr.push(r);
+          perDev.set(r.device_id, arr);
+        });
 
-        const estHours =
-          avgWatt > 2 ? Math.min(24, deltaWh / avgWatt) : list.length * 0.25;
-        dayItem.hoursActive = Number(estHours.toFixed(1));
-        dayItem.costRp = Math.round((deltaWh / 1000) * tarif);
+        let totalDeltaWh = 0;
+        let totalHoursDay = 0;
+
+        perDev.forEach((devList) => {
+          const deltaWh =
+            devList.length > 1
+              ? Math.max(
+                  0,
+                  Number(devList[devList.length - 1].e_wh) -
+                    Number(devList[0].e_wh),
+                )
+              : Number(devList[0].p) * 0.25;
+          const avgWatt =
+            devList.reduce((sum, item) => sum + Number(item.p), 0) /
+            devList.length;
+          const estHours =
+            avgWatt > 2
+              ? Math.min(24, deltaWh / avgWatt)
+              : devList.length * 0.25;
+
+          totalDeltaWh += deltaWh;
+          totalHoursDay += estHours;
+        });
+
+        dayItem.hoursActive = Number(Math.min(24, totalHoursDay).toFixed(1));
+        dayItem.costRp = Math.round((totalDeltaWh / 1000) * tarif);
       }
     });
 
@@ -344,8 +366,9 @@ export default function CekPage() {
 
     const totalHours = days.reduce((acc, d) => acc + d.hoursActive, 0);
     const avgHours = Number((totalHours / 7).toFixed(1));
+    const targetRef = focusedDevice || breakdown[0];
     const wattRef =
-      focusedDevice.latestWatt > 2 ? focusedDevice.latestWatt : 50;
+      targetRef && targetRef.latestWatt > 2 ? targetRef.latestWatt : 50;
     const savingEstimateRp = Math.round(((wattRef * 2) / 1000) * tarif * 30);
 
     return {
@@ -354,7 +377,11 @@ export default function CekPage() {
       peakDay: maxHours > 0 ? peakItem : null,
       savingEstimateRp,
     };
-  }, [focusedDevice, sevenDayReadings, tarif]);
+  }, [focusedDevice, breakdown, sevenDayReadings, tarif]);
+
+  const handleToggleDevice = (id: string) => {
+    setSelectedDeviceId((prev) => (prev === id ? null : id));
+  };
 
   const handleSaveTarif = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -394,6 +421,11 @@ export default function CekPage() {
   });
 
   const overBudgetRp = projectedMonthRp - batasAmanRp;
+  const totalActiveWattAll = breakdown.reduce(
+    (sum, item) => sum + item.latestWatt,
+    0,
+  );
+  const onlineCountAll = breakdown.filter((item) => item.isOnline).length;
 
   return (
     <AppShell>
@@ -480,7 +512,7 @@ export default function CekPage() {
                 </h2>
               </div>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface text-xs font-semibold shrink-0 whitespace-nowrap">
-                <span className="w-2 h-2 rounded-full bg-secondary-container" />
+                <span className="w-2 h-2 rounded-full bg-tertiary-fixed-dim" />
                 Siklus Aktif
               </span>
             </div>
@@ -521,7 +553,7 @@ export default function CekPage() {
                       {donutSegments.map((seg) => (
                         <circle
                           key={seg.id}
-                          className="transition-all duration-700"
+                          className="transition-all duration-700 cursor-pointer"
                           cx="90"
                           cy="90"
                           fill="transparent"
@@ -529,50 +561,62 @@ export default function CekPage() {
                           stroke={seg.color}
                           strokeDasharray={`${seg.dashLength} ${circumference}`}
                           strokeDashoffset={seg.dashOffset}
-                          strokeWidth="20"
+                          strokeWidth={
+                            selectedDeviceId === seg.id ? "24" : "20"
+                          }
+                          onClick={() => handleToggleDevice(seg.id)}
                         />
                       ))}
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-4">
                       <span className="text-[10px] sm:text-xs uppercase tracking-wider text-on-surface-variant font-bold">
-                        Total Biaya
+                        {focusedDevice ? focusedDevice.nama : "Total Biaya"}
                       </span>
                       <span className="text-xl sm:text-2xl text-on-surface font-extrabold tracking-tight leading-tight">
-                        Rp {Math.round(totalBiaya).toLocaleString("id-ID")}
+                        Rp{" "}
+                        {Math.round(
+                          focusedDevice ? focusedDevice.biaya : totalBiaya,
+                        ).toLocaleString("id-ID")}
                       </span>
                       <span className="text-xs text-on-surface-variant mt-0.5">
-                        {totalKwh.toFixed(2).replace(".", ",")} kWh terukur
+                        {(focusedDevice ? focusedDevice.kwh : totalKwh)
+                          .toFixed(2)
+                          .replace(".", ",")}{" "}
+                        kWh terukur
                       </span>
                     </div>
                   </div>
 
-                  {/* Quick Stat Tiles */}
+                  {/* Quick Stat Tiles (Hanya masing-masing perangkat) */}
                   <div className="flex flex-col gap-2.5 w-full sm:max-w-[220px]">
-                    {breakdown.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setSelectedDeviceId(item.id)}
-                        className={`bg-surface-container-lowest p-3 rounded-lg shadow-2xs flex items-center justify-between gap-2 text-left transition-all cursor-pointer border ${
-                          focusedDevice?.id === item.id
-                            ? "border-primary-container/60"
-                            : "border-transparent hover:border-outline-variant/60"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full shrink-0"
-                            style={{ backgroundColor: item.color }}
-                          />
-                          <span className="text-xs text-on-surface-variant font-semibold truncate">
-                            {item.nama}
+                    {breakdown.map((item) => {
+                      const isSelected = selectedDeviceId === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleToggleDevice(item.id)}
+                          className={`bg-surface-container-lowest p-3 rounded-lg shadow-2xs flex items-center justify-between gap-2 text-left transition-all cursor-pointer border ${
+                            isSelected
+                              ? "border-primary-container bg-primary-fixed/15"
+                              : "border-transparent hover:border-outline-variant/60"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full shrink-0"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            <span className="text-xs text-on-surface-variant font-semibold truncate">
+                              {item.nama}
+                            </span>
+                          </div>
+                          <span className="text-xs sm:text-sm font-bold text-on-surface shrink-0 whitespace-nowrap">
+                            {item.persen.toFixed(1).replace(".", ",")}%
                           </span>
-                        </div>
-                        <span className="text-xs sm:text-sm font-bold text-on-surface shrink-0 whitespace-nowrap">
-                          {item.persen.toFixed(1).replace(".", ",")}%
-                        </span>
-                      </button>
-                    ))}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -580,15 +624,15 @@ export default function CekPage() {
                 <div className="flex flex-col gap-3.5 sm:gap-4">
                   {breakdown.map((item, idx) => {
                     const isTop = idx === 0 && totalKwh > 0;
-                    const isFocused = focusedDevice?.id === item.id;
+                    const isFocused = selectedDeviceId === item.id;
 
                     return (
                       <div
                         key={item.id}
-                        onClick={() => setSelectedDeviceId(item.id)}
+                        onClick={() => handleToggleDevice(item.id)}
                         className={`bg-surface-container-low p-4 sm:p-5 rounded-xl hover:bg-surface-container transition-all flex flex-col gap-2.5 cursor-pointer border ${
                           isFocused
-                            ? "border-primary-container/50"
+                            ? "border-primary-container/60"
                             : "border-transparent"
                         }`}
                       >
@@ -653,17 +697,15 @@ export default function CekPage() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedDeviceId(item.id);
+                              handleToggleDevice(item.id);
                             }}
                             className="inline-flex items-center gap-1 text-xs sm:text-sm font-bold text-primary-container hover:text-primary transition-colors cursor-pointer whitespace-nowrap"
                           >
                             <span>
-                              {isFocused
-                                ? "Sedang ditampilkan"
-                                : "Lihat detail"}
+                              {isFocused ? "Kembali ke semua" : "Lihat detail"}
                             </span>
                             <span className="material-symbols-outlined text-[16px]">
-                              arrow_forward
+                              {isFocused ? "close" : "arrow_forward"}
                             </span>
                           </button>
                         </div>
@@ -834,33 +876,41 @@ export default function CekPage() {
               </p>
             </section>
 
-            {/* Bottom Card: Rincian Perangkat Terpilih (Deep Dive) */}
-            {focusedDevice && (
+            {/* Bottom Card: Rincian Gabungan (Default) atau Perangkat Terpilih */}
+            {breakdown.length > 0 && (
               <section className="bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-4 sm:p-6 lg:p-7 shadow-2xs flex flex-col gap-4 sm:gap-5">
                 <div className="flex flex-wrap items-start justify-between gap-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span
                       className="w-9 h-9 rounded-lg text-on-primary flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: focusedDevice.color }}
+                      style={{
+                        backgroundColor: focusedDevice
+                          ? focusedDevice.color
+                          : "#1E40AF",
+                      }}
                     >
                       <span className="material-symbols-outlined text-[19px]">
-                        {focusedDevice.icon}
+                        {focusedDevice ? focusedDevice.icon : "devices"}
                       </span>
                     </span>
                     <div className="min-w-0">
                       <h2 className="font-bold text-base sm:text-lg text-on-surface truncate">
-                        Rincian: {focusedDevice.nama}
+                        {focusedDevice
+                          ? `Rincian: ${focusedDevice.nama}`
+                          : `Rincian: Seluruh Alat (${breakdown.length})`}
                       </h2>
                       <p className="text-xs sm:text-sm text-on-surface-variant truncate">
                         Rata-rata {sevenDayStats.avgHours} jam/hari •{" "}
-                        {focusedDevice.isOnline
-                          ? `Daya saat ini ${focusedDevice.latestWatt} W`
-                          : "Sensor Offline"}
+                        {focusedDevice
+                          ? focusedDevice.isOnline
+                            ? `Daya saat ini ${focusedDevice.latestWatt} W`
+                            : "Sensor Offline"
+                          : `${onlineCountAll} aktif (${totalActiveWattAll} W)`}
                       </p>
                     </div>
                   </div>
                   <span className="px-2.5 py-1 rounded-md bg-surface-container-high text-on-surface text-xs font-semibold shrink-0 whitespace-nowrap">
-                    {focusedDevice.subLabel}
+                    {focusedDevice ? focusedDevice.subLabel : "Gabungan"}
                   </span>
                 </div>
 
@@ -927,8 +977,9 @@ export default function CekPage() {
                       Saran Penghematan
                     </span>
                     <p className="text-xs sm:text-sm text-on-secondary-fixed-variant leading-relaxed">
-                      Kurangi 2 jam pemakaian {focusedDevice.nama} setiap hari
-                      untuk memangkas ± Rp{" "}
+                      Kurangi 2 jam pemakaian{" "}
+                      {focusedDevice ? focusedDevice.nama : breakdown[0].nama}{" "}
+                      setiap hari untuk memangkas ± Rp{" "}
                       {sevenDayStats.savingEstimateRp.toLocaleString("id-ID")}{" "}
                       hingga akhir bulan. Atau simulasikan skenario lainnya di{" "}
                       <Link

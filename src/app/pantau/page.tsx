@@ -75,26 +75,31 @@ export default function PantauPage() {
   }, []);
 
   const fetchPantauData = useCallback(async () => {
-    setLoading(true);
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
+    let userDevices: Device[] = [];
     if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("tarif_per_kwh")
-        .eq("id", user.id)
-        .single();
+      const [{ data: profile }, { data: devs }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("tarif_per_kwh")
+          .eq("id", user.id)
+          .single(),
+        supabase
+          .from("devices")
+          .select("id, nama, jenis_beban, last_seen_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: true }),
+      ]);
+
       if (profile?.tarif_per_kwh) {
         setTarif(Number(profile.tarif_per_kwh));
       }
+      userDevices = (devs as Device[]) || [];
     }
-
-    const { data: devs } = await supabase
-      .from("devices")
-      .select("id, nama, jenis_beban, last_seen_at")
-      .order("created_at", { ascending: true });
+    setDevices(userDevices);
 
     // Cek ketersediaan data > 21 hari untuk tombol 30 Hari
     const twentyOneDaysAgo = new Date();
@@ -119,14 +124,19 @@ export default function PantauPage() {
       .select("*")
       .gte("ts", startTime.toISOString())
       .order("ts", { ascending: true })
-      .limit(200);
+      .limit(5000);
 
     if (selectedDevice !== "all") {
       query = query.eq("device_id", selectedDevice);
+    } else if (userDevices.length > 0) {
+      query = query.in(
+        "device_id",
+        userDevices.map((d) => d.id),
+      );
     }
 
     const { data: reads } = await query;
-    setReadings((reads as Reading[]) || []);
+    setReadings(userDevices.length > 0 ? (reads as Reading[]) || [] : []);
     setLoading(false);
   }, [supabase, range, selectedDevice]);
 

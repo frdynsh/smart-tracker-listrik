@@ -301,7 +301,7 @@ export default function PengingatPage() {
                   Peringatan Masuk
                 </h2>
                 {unreadCount > 0 && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs bg-secondary-fixed text-on-secondary-fixed font-bold whitespace-nowrap shrink-0">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs bg-tertiary-fixed text-on-secondary-fixed font-bold whitespace-nowrap shrink-0">
                     {unreadCount} Baru
                   </span>
                 )}
@@ -372,7 +372,7 @@ export default function PengingatPage() {
                       >
                         {/* Left accent strip for unread items */}
                         {isUnread && (
-                          <div className="absolute left-0 top-3.5 bottom-3.5 w-1.5 bg-secondary-container rounded-r-md" />
+                          <div className="absolute left-0 top-3.5 bottom-3.5 w-1.5 bg-tertiary-fixed-dim rounded-r-md" />
                         )}
 
                         <div
@@ -384,7 +384,7 @@ export default function PengingatPage() {
                             <span
                               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold whitespace-nowrap ${
                                 isUnread
-                                  ? "bg-secondary-fixed text-on-secondary-fixed"
+                                  ? "bg-tertiary-fixed text-on-secondary-fixed"
                                   : "bg-surface-container-high text-on-surface-variant"
                               }`}
                             >

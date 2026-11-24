@@ -668,7 +668,7 @@ export default function PerangkatPage() {
                           {dev.isOnline ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-high text-primary-container text-xs font-semibold whitespace-nowrap shrink-0">
                               <span className="w-1.5 h-1.5 rounded-full bg-primary-container" />
-                              Terhubung (Online)
+                              Online
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-error-container text-error text-xs font-semibold whitespace-nowrap shrink-0">
