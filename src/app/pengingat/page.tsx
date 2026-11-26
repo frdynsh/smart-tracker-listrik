@@ -94,7 +94,7 @@ export default function PengingatPage() {
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(20),
-        supabase.from("alert_rules").select("*").eq("user_id", user.id),
+        supabase.from("user_thresholds").select("*").eq("user_id", user.id),
         supabase
           .from("devices")
           .select("id, nama, jenis_beban, last_seen_at")
@@ -214,7 +214,7 @@ export default function PengingatPage() {
     const parsedBiaya = Math.max(1000, Number(batasRp) || 50000);
 
     const { data: existingRules } = await supabase
-      .from("alert_rules")
+      .from("user_thresholds")
       .select("id, tipe")
       .eq("user_id", user.id);
 
@@ -223,12 +223,12 @@ export default function PengingatPage() {
 
     if (hasDurasi) {
       await supabase
-        .from("alert_rules")
+        .from("user_thresholds")
         .update({ ambang: parsedDurasi, aktif: durasiAktif })
         .eq("user_id", user.id)
         .eq("tipe", "durasi_lama");
     } else {
-      await supabase.from("alert_rules").insert({
+      await supabase.from("user_thresholds").insert({
         user_id: user.id,
         tipe: "durasi_lama",
         ambang: parsedDurasi,
@@ -238,12 +238,12 @@ export default function PengingatPage() {
 
     if (hasBiaya) {
       await supabase
-        .from("alert_rules")
+        .from("user_thresholds")
         .update({ ambang: parsedBiaya, aktif: biayaAktif })
         .eq("user_id", user.id)
         .eq("tipe", "estimasi_biaya");
     } else {
-      await supabase.from("alert_rules").insert({
+      await supabase.from("user_thresholds").insert({
         user_id: user.id,
         tipe: "estimasi_biaya",
         ambang: parsedBiaya,

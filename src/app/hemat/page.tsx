@@ -146,7 +146,7 @@ export default function HematPage() {
         .eq("id", user.id)
         .single(),
       supabase
-        .from("alert_rules")
+        .from("user_thresholds")
         .select("ambang")
         .eq("user_id", user.id)
         .eq("tipe", "estimasi_biaya")
@@ -237,7 +237,7 @@ export default function HematPage() {
     setSavingTarget(true);
 
     const { data: existing } = await supabase
-      .from("alert_rules")
+      .from("user_thresholds")
       .select("id")
       .eq("user_id", user.id)
       .eq("tipe", "estimasi_biaya")
@@ -245,11 +245,11 @@ export default function HematPage() {
 
     if (existing?.id) {
       await supabase
-        .from("alert_rules")
+        .from("user_thresholds")
         .update({ ambang: newTarget })
         .eq("id", existing.id);
     } else {
-      await supabase.from("alert_rules").insert({
+      await supabase.from("user_thresholds").insert({
         user_id: user.id,
         tipe: "estimasi_biaya",
         ambang: newTarget,

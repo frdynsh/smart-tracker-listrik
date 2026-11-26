@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     todayStart.setHours(0, 0, 0, 0);
 
     const { data: rules } = await supabaseAdmin
-      .from("alert_rules")
+      .from("user_thresholds")
       .select("*")
       .eq("user_id", device.user_id)
       .eq("aktif", true);

@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Abaikan kredensial ESP32 & file rahasia lokal
+firmware/**/secrets.h
+.env.local
