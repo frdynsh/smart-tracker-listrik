@@ -4,17 +4,16 @@
 #include <WiFiManager.h>      // Library: WiFiManager by tzapu
 #include <PZEM004Tv30.h>      // Library: PZEM004Tv30 by mandulaj
 #include <time.h>
-#include "secrets.h
 
 // ==========================================
 // 1. IDENTITAS UNIT HARDWARE (PRE-PROVISIONED)
 // ==========================================
-const char* CLAIM_CODE = CLAIM_CODE;
-const char* serverUrl  = SERVER_URL;
+const char* CLAIM_CODE = "STL-1001";
+const char* serverUrl  = "https://smart-tracker-listrik.vercel.app/api/ingest";
 
 // Kredensial sesuai baris STL-1001 di tabel devices Supabase
-const char* deviceId   = DEVICE_ID;
-const char* apiKey     = API_KEY;
+const char* deviceId   = "1e7ec3f5-17e7-4d76-8452-72ae79f19d32";
+const char* apiKey     = "stl_esp32_unit01_rahasia991";
 
 // ==========================================
 // 2. PENGATURAN SENSOR, PIN & INTERVAL

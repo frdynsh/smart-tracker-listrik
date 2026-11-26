@@ -47,9 +47,7 @@ export async function POST(request: Request) {
     // Validasi Perangkat & Kunci Alat
     const { data: device, error: devError } = await supabaseAdmin
       .from("devices")
-      .select(
-        "id, user_id, nama, daya_nominal_w, ingest_key_hash, faktor_koreksi",
-      )
+      .select("id, user_id, nama, daya_nominal_w, ingest_key_hash")
       .eq("id", device_id)
       .single();
 
@@ -71,75 +69,73 @@ export async function POST(request: Request) {
       );
     }
 
-    const correctedPower = Number((p * device.faktor_koreksi).toFixed(2));
+    const measuredPower = Number(Number(p).toFixed(2));
     const parsedTs =
       typeof ts === "number" ? new Date(ts * 1000).toISOString() : ts;
 
-    // Simpan bacaan sensor (anti-duplikat)
-    const { error: insertError } = await supabaseAdmin.from("readings").upsert(
-      {
-        device_id: device.id,
-        ts: parsedTs,
-        v,
-        i,
-        p: correctedPower,
-        e_wh,
-        is_simulated: false,
-      },
-      { onConflict: "device_id,ts", ignoreDuplicates: true },
-    );
+    // Simpan bacaan sensor
+    const { error: insertError } = await supabaseAdmin.from("readings").insert({
+      device_id: device.id,
+      ts: parsedTs,
+      v,
+      i,
+      p: measuredPower,
+      e_wh,
+    });
 
     if (insertError) {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
-    // Update status Online
+    // Update status Online (last_seen_at)
     await supabaseAdmin
       .from("devices")
       .update({ last_seen_at: new Date().toISOString() })
       .eq("id", device.id);
 
     // Evaluasi Aturan Peringatan (Maks 1x per hari)
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    if (device.user_id) {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
 
-    const { data: rules } = await supabaseAdmin
-      .from("user_thresholds")
-      .select("*")
-      .eq("user_id", device.user_id)
-      .eq("aktif", true);
+      const { data: rules } = await supabaseAdmin
+        .from("user_thresholds")
+        .select("*")
+        .eq("user_id", device.user_id)
+        .eq("aktif", true);
 
-    if (rules) {
-      for (const rule of rules) {
-        if (rule.tipe === "durasi_lama") {
-          const thresholdWatt = Math.max(5, device.daya_nominal_w * 0.1);
-          if (correctedPower >= thresholdWatt) {
-            const { count: existingNotif } = await supabaseAdmin
-              .from("notifications")
-              .select("*", { count: "exact", head: true })
-              .eq("user_id", device.user_id)
-              .eq("device_id", device.id)
-              .eq("tipe", "durasi_lama")
-              .gte("created_at", todayStart.toISOString());
-
-            if ((existingNotif || 0) === 0) {
-              const { count: activeIntervals } = await supabaseAdmin
-                .from("readings")
+      if (rules) {
+        for (const rule of rules) {
+          if (rule.tipe === "durasi_lama") {
+            const thresholdWatt = Math.max(5, device.daya_nominal_w * 0.1);
+            if (measuredPower >= thresholdWatt) {
+              const { count: existingNotif } = await supabaseAdmin
+                .from("notifications")
                 .select("*", { count: "exact", head: true })
+                .eq("user_id", device.user_id)
                 .eq("device_id", device.id)
-                .gte("ts", todayStart.toISOString())
-                .gte("p", thresholdWatt);
+                .eq("tipe", "durasi_lama")
+                .gte("created_at", todayStart.toISOString());
 
-              const activeHours = ((activeIntervals || 0) * 30) / 3600;
-              if (activeHours >= rule.ambang) {
-                await supabaseAdmin.from("notifications").insert({
-                  user_id: device.user_id,
-                  device_id: device.id,
-                  tipe: "durasi_lama",
-                  judul: `${device.nama} menyala terlalu lama`,
-                  isi: `${device.nama} telah menyala sekitar ${activeHours.toFixed(1)} jam hari ini (batas: ${rule.ambang} jam).`,
-                  link: "/cek",
-                });
+              if ((existingNotif || 0) === 0) {
+                const { count: activeIntervals } = await supabaseAdmin
+                  .from("readings")
+                  .select("*", { count: "exact", head: true })
+                  .eq("device_id", device.id)
+                  .gte("ts", todayStart.toISOString())
+                  .gte("p", thresholdWatt);
+
+                const activeHours = ((activeIntervals || 0) * 30) / 3600;
+                if (activeHours >= rule.ambang) {
+                  await supabaseAdmin.from("notifications").insert({
+                    user_id: device.user_id,
+                    device_id: device.id,
+                    tipe: "durasi_lama",
+                    judul: `${device.nama} menyala terlalu lama`,
+                    isi: `${device.nama} telah menyala sekitar ${activeHours.toFixed(1)} jam hari ini (batas: ${rule.ambang} jam).`,
+                    link: "/cek",
+                  });
+                }
               }
             }
           }
