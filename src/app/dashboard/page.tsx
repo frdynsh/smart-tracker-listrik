@@ -100,12 +100,20 @@ export default function DashboardPage() {
         supabase
           .from("devices")
           .select("*")
+          .eq("user_id", user.id)
           .order("created_at", { ascending: true }),
       ]);
 
+    const userDevices = (devs as Device[]) || [];
     if (profile?.tarif_per_kwh) setTarif(Number(profile.tarif_per_kwh));
     if (rule?.ambang) setAmbangBiaya(Number(rule.ambang));
-    setDevices((devs as Device[]) || []);
+    setDevices(userDevices);
+
+    if (userDevices.length === 0) {
+      setReadings([]);
+      setLoading(false);
+      return;
+    }
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -113,8 +121,13 @@ export default function DashboardPage() {
     const { data: reads } = await supabase
       .from("readings")
       .select("*")
+      .in(
+        "device_id",
+        userDevices.map((d) => d.id),
+      )
       .gte("ts", todayStart.toISOString())
-      .order("ts", { ascending: true });
+      .order("ts", { ascending: true })
+      .limit(5000);
 
     setReadings((reads as Reading[]) || []);
     setLoading(false);

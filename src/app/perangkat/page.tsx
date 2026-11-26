@@ -1,14 +1,23 @@
 // src/app/perangkat/page.tsx
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import { createClient } from "@/lib/supabase";
 
 interface DeviceRow {
   id: string;
+  user_id?: string | null;
+  claim_code?: string | null;
   nama: string;
   jenis_beban?: string | null;
   lokasi?: string | null;
@@ -30,19 +39,35 @@ const JENIS_OPTIONS = [
   "Kipas Angin",
   "Lampu Meja",
   "Teko Listrik",
+  "Dispenser Air",
+  "Komputer / PC",
+  "TV / Hiburan",
   "Lainnya (≤ 600 W)",
+];
+
+const LOKASI_OPTIONS = [
+  "Kamar Tidur Utama",
+  "Ruang Tamu",
+  "Ruang Kerja",
+  "Dapur",
+  "Kamar Anak",
+  "Lainnya",
 ];
 
 const OFFLINE_THRESHOLD_MS = 120_000;
 
-async function sha256Hex(text: string): Promise<string> {
-  const buf = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(text),
-  );
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+function extractClaimCode(rawText: string): string {
+  const trimmed = rawText.trim();
+  try {
+    const url = new URL(trimmed);
+    const param = url.searchParams.get("claim");
+    if (param) return param.trim().toUpperCase();
+  } catch {
+    // Bukan URL penuh, lanjut ekstrak pola kode stiker atau teks langsung
+  }
+  const match = trimmed.match(/STL-[A-Z0-9]+/i);
+  if (match) return match[0].toUpperCase();
+  return trimmed.toUpperCase();
 }
 
 function getDeviceIcon(nama: string, jenis?: string | null): string {
@@ -64,17 +89,18 @@ function getDeviceIcon(nama: string, jenis?: string | null): string {
   if (text.includes("kulkas") || text.includes("fridge")) {
     return "kitchen";
   }
-  if (text.includes("tv") || text.includes("komputer")) {
+  if (text.includes("tv") || text.includes("komputer") || text.includes("pc")) {
     return "tv";
   }
   return "power";
 }
 
-export default function PerangkatPage() {
+function PerangkatContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
 
-  // Mode layar: "list" (Daftar Perangkat) atau "wizard" (Tambah Perangkat & Uji Koneksi)
+  // Mode layar: "list" (Daftar Perangkat) atau "wizard" (Pindai QR & Klaim Perangkat)
   const [viewMode, setViewMode] = useState<"list" | "wizard">("list");
 
   const [devices, setDevices] = useState<DeviceRow[]>([]);
@@ -89,26 +115,40 @@ export default function PerangkatPage() {
   const [editNominal, setEditNominal] = useState<string>("50");
   const [savingEdit, setSavingEdit] = useState<boolean>(false);
 
-  // State Wizard Step 1
+  // State Wizard Step 1: QR Scanner & Verifikasi Kode Stiker
+  const [claimCodeInput, setClaimCodeInput] = useState<string>("");
+  const [verifyingCode, setVerifyingCode] = useState<boolean>(false);
+  const [verifiedDevice, setVerifiedDevice] = useState<DeviceRow | null>(null);
+  const [claimStatusMsg, setClaimStatusMsg] = useState<{
+    type: "success" | "error" | "info";
+    text: string;
+  } | null>(null);
+
+  // State Kamera QR Live
+  const [cameraActive, setCameraActive] = useState<boolean>(false);
+  const [cameraError, setCameraError] = useState<string>("");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanTimerRef = useRef<number | null>(null);
+
+  // State Wizard Step 2: Lengkapi Identitas Perangkat
   const [nama, setNama] = useState<string>("");
   const [jenisBeban, setJenisBeban] = useState<string>("Kipas Angin");
   const [jenisDropdownOpen, setJenisDropdownOpen] = useState<boolean>(false);
   const jenisDropdownRef = useRef<HTMLDivElement | null>(null);
-  const [lokasi, setLokasi] = useState<string>("");
+  const [lokasi, setLokasi] = useState<string>("Kamar Tidur Utama");
+  const [lokasiDropdownOpen, setLokasiDropdownOpen] = useState<boolean>(false);
+  const lokasiDropdownRef = useRef<HTMLDivElement | null>(null);
   const [dayaNominal, setDayaNominal] = useState<string>("50");
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
 
-  // State Wizard Step 2 (Kredensial)
-  const [generatedCreds, setGeneratedCreds] = useState<{
+  // State Wizard Step 3: Uji Koneksi Real-Time
+  const [claimedDeviceInfo, setClaimedDeviceInfo] = useState<{
     id: string;
-    key: string;
     nama: string;
+    claimCode: string;
   } | null>(null);
-  const [showSecretKey, setShowSecretKey] = useState<boolean>(false);
-  const [copiedField, setCopiedField] = useState<"id" | "key" | null>(null);
-
-  // State Wizard Step 3 (Uji Koneksi Real-Time)
   const [testState, setTestState] = useState<
     "idle" | "waiting" | "success" | "timeout"
   >("idle");
@@ -118,6 +158,25 @@ export default function PerangkatPage() {
     p: number;
   } | null>(null);
   const testStartRef = useRef<number | null>(null);
+  const autoClaimHandledRef = useRef<boolean>(false);
+
+  const stopCamera = useCallback(() => {
+    if (scanTimerRef.current) {
+      window.clearInterval(scanTimerRef.current);
+      scanTimerRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setCameraActive(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -127,9 +186,18 @@ export default function PerangkatPage() {
       ) {
         setJenisDropdownOpen(false);
       }
+      if (
+        lokasiDropdownRef.current &&
+        !lokasiDropdownRef.current.contains(event.target as Node)
+      ) {
+        setLokasiDropdownOpen(false);
+      }
     };
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setJenisDropdownOpen(false);
+      if (event.key === "Escape") {
+        setJenisDropdownOpen(false);
+        setLokasiDropdownOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
@@ -161,7 +229,7 @@ export default function PerangkatPage() {
         supabase
           .from("devices")
           .select(
-            "id, nama, jenis_beban, lokasi, daya_nominal_w, last_seen_at, created_at",
+            "id, user_id, claim_code, nama, jenis_beban, lokasi, daya_nominal_w, last_seen_at, created_at",
           )
           .eq("user_id", user.id)
           .order("created_at", { ascending: true }),
@@ -170,7 +238,7 @@ export default function PerangkatPage() {
           .select("device_id, ts, v, i, p, e_wh")
           .gte("ts", startOfToday.toISOString())
           .order("ts", { ascending: true })
-          .limit(1000),
+          .limit(3000),
       ]);
 
     if (profile?.tarif_per_kwh) {
@@ -187,9 +255,177 @@ export default function PerangkatPage() {
     return () => clearInterval(interval);
   }, [loadDevices]);
 
+  // Verifikasi Kode Stiker QR terhadap inventaris tabel devices di Supabase
+  const verifyClaimCode = useCallback(
+    async (rawInput: string) => {
+      const normalized = extractClaimCode(rawInput);
+      setClaimCodeInput(normalized);
+      setErrorMsg("");
+      setVerifiedDevice(null);
+
+      if (!normalized) {
+        setClaimStatusMsg({
+          type: "error",
+          text: "Masukkan atau pindai kode unik pada stiker perangkat terlebih dahulu.",
+        });
+        return;
+      }
+
+      setVerifyingCode(true);
+      setClaimStatusMsg(null);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setVerifyingCode(false);
+        setClaimStatusMsg({
+          type: "error",
+          text: "Sesi login berakhir. Silakan masuk kembali.",
+        });
+        return;
+      }
+
+      const { data: foundDev, error } = await supabase
+        .from("devices")
+        .select(
+          "id, user_id, claim_code, nama, jenis_beban, lokasi, daya_nominal_w, last_seen_at",
+        )
+        .eq("claim_code", normalized)
+        .maybeSingle();
+
+      setVerifyingCode(false);
+
+      if (error) {
+        setClaimStatusMsg({
+          type: "error",
+          text: "Gagal memeriksa kode stiker: " + error.message,
+        });
+        return;
+      }
+
+      // Jika RLS menyembunyikan baris karena user_id milik akun lain, atau kode tidak ditemukan
+      if (!foundDev) {
+        setClaimStatusMsg({
+          type: "error",
+          text: `Kode "${normalized}" tidak tersedia atau sedang terhubung ke akun lain. Pastikan kode benar atau lepaskan dari akun sebelumnya.`,
+        });
+        return;
+      }
+
+      if (foundDev.user_id === user.id) {
+        setClaimStatusMsg({
+          type: "info",
+          text: `Perangkat "${foundDev.nama}" (${normalized}) sudah terpasang di akun Anda.`,
+        });
+        return;
+      }
+
+      if (foundDev.user_id && foundDev.user_id !== user.id) {
+        setClaimStatusMsg({
+          type: "error",
+          text: `Perangkat dengan kode "${normalized}" sedang terhubung ke akun lain. Lepaskan perangkat dari akun sebelumnya terlebih dahulu.`,
+        });
+        return;
+      }
+
+      // Unit valid dan belum diklaim (user_id === null)
+      setVerifiedDevice(foundDev as DeviceRow);
+      setNama(
+        foundDev.nama && !foundDev.nama.startsWith("Colokan Pintar")
+          ? foundDev.nama
+          : "",
+      );
+      if (foundDev.jenis_beban) setJenisBeban(foundDev.jenis_beban);
+      if (foundDev.daya_nominal_w)
+        setDayaNominal(String(foundDev.daya_nominal_w));
+      setClaimStatusMsg({
+        type: "success",
+        text: `Kode ${normalized} terverifikasi! Unit siap diklaim. silahkan lengkapi identitas perangkat pada Langkah 2.`,
+      });
+    },
+    [supabase],
+  );
+
+  // Tangkap parameter ?claim=STL-1001 dari hasil scan kamera bawaan HP
+  useEffect(() => {
+    const claimParam = searchParams.get("claim");
+    if (claimParam && !autoClaimHandledRef.current) {
+      autoClaimHandledRef.current = true;
+      setViewMode("wizard");
+      verifyClaimCode(claimParam);
+    }
+  }, [searchParams, verifyClaimCode]);
+
+  // Buka kamera HP/Laptop untuk memindai QR Code langsung di browser
+  const handleStartCamera = async () => {
+    setCameraError("");
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError(
+        "Browser tidak mendukung akses kamera langsung. Silakan masukkan kode pada stiker secara manual di bawah.",
+      );
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setCameraActive(true);
+
+      // Tunggu elemen <video> terpasang lalu mulai pemindaian frame
+      window.setTimeout(async () => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play().catch(() => {});
+        }
+
+        const BarcodeDetectorClass = (
+          window as unknown as {
+            BarcodeDetector?: new (opts: { formats: string[] }) => {
+              detect: (
+                source: HTMLVideoElement,
+              ) => Promise<Array<{ rawValue?: string }>>;
+            };
+          }
+        ).BarcodeDetector;
+
+        if (!BarcodeDetectorClass) {
+          setCameraError(
+            "Kamera aktif, tetapi deteksi QR otomatis belum didukung di browser ini. Anda bisa memindai QR memakai kamera bawaan HP atau mengetik kode stiker di bawah.",
+          );
+          return;
+        }
+
+        const detector = new BarcodeDetectorClass({ formats: ["qr_code"] });
+        scanTimerRef.current = window.setInterval(async () => {
+          if (!videoRef.current || videoRef.current.readyState < 2) return;
+          try {
+            const barcodes = await detector.detect(videoRef.current);
+            if (barcodes.length > 0 && barcodes[0].rawValue) {
+              const scannedValue = barcodes[0].rawValue;
+              stopCamera();
+              verifyClaimCode(scannedValue);
+            }
+          } catch {
+            // Abaikan error frame tunggal saat fokus kamera menyesuaikan
+          }
+        }, 500);
+      }, 150);
+    } catch {
+      setCameraError(
+        "Izin kamera ditolak atau kamera tidak ditemukan. Silakan masukkan kode unik perangkat secara manual di bawah.",
+      );
+      stopCamera();
+    }
+  };
+
   // Polling Uji Koneksi Step 3 ketika status "waiting"
   useEffect(() => {
-    if (testState !== "waiting" || !generatedCreds?.id) return;
+    if (testState !== "waiting" || !claimedDeviceInfo?.id) return;
 
     if (!testStartRef.current) {
       testStartRef.current = Date.now();
@@ -205,7 +441,7 @@ export default function PerangkatPage() {
       const { data: latestRead } = await supabase
         .from("readings")
         .select("v, i, p, ts")
-        .eq("device_id", generatedCreds.id)
+        .eq("device_id", claimedDeviceInfo.id)
         .order("ts", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -224,16 +460,20 @@ export default function PerangkatPage() {
     checkConnection();
     const poll = setInterval(checkConnection, 3000);
     return () => clearInterval(poll);
-  }, [testState, generatedCreds, supabase, loadDevices]);
+  }, [testState, claimedDeviceInfo, supabase, loadDevices]);
 
   const handleOpenWizard = () => {
+    stopCamera();
     setErrorMsg("");
+    setCameraError("");
+    setClaimCodeInput("");
+    setVerifiedDevice(null);
+    setClaimStatusMsg(null);
     setNama("");
     setJenisBeban("Kipas Angin");
-    setLokasi("");
+    setLokasi("Kamar Tidur Utama");
     setDayaNominal("50");
-    setGeneratedCreds(null);
-    setShowSecretKey(false);
+    setClaimedDeviceInfo(null);
     setTestState("idle");
     setFirstPacket(null);
     testStartRef.current = null;
@@ -242,15 +482,24 @@ export default function PerangkatPage() {
   };
 
   const handleBackToList = () => {
+    stopCamera();
     setViewMode("list");
     setErrorMsg("");
     loadDevices();
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleCreateCredentials = async (e: React.FormEvent) => {
+  // Langkah 2: Ikat kepemilikan unit QR ke akun user & simpan identitas perangkat
+  const handleClaimAndSaveDevice = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
+
+    if (!verifiedDevice) {
+      setErrorMsg(
+        "Verifikasi kode stiker / QR Code perangkat pada Langkah 1 terlebih dahulu.",
+      );
+      return;
+    }
 
     const nominalNum = Number(dayaNominal);
     if (!nama.trim()) {
@@ -284,79 +533,72 @@ export default function PerangkatPage() {
       { onConflict: "id", ignoreDuplicates: true },
     );
 
-    const rawApiKey = "stl_" + crypto.randomUUID().replace(/-/g, "");
-    const keyHash = await sha256Hex(rawApiKey);
-
-    const payloadWithLokasi: Record<string, unknown> = {
-      user_id: user.id,
-      nama: nama.trim(),
-      jenis_beban: jenisBeban,
-      lokasi: lokasi.trim() || null,
-      daya_nominal_w: nominalNum,
-      ingest_key_hash: keyHash,
-    };
-
-    let insertRes = await supabase
+    const { data: updatedDev, error: claimErr } = await supabase
       .from("devices")
-      .insert(payloadWithLokasi)
+      .update({
+        user_id: user.id,
+        nama: nama.trim(),
+        jenis_beban: jenisBeban,
+        lokasi: lokasi.trim() || null,
+        daya_nominal_w: nominalNum,
+      })
+      .eq("id", verifiedDevice.id)
+      .is("user_id", null)
       .select()
-      .single();
-
-    // Fallback apabila kolom 'lokasi' belum ada di skema tabel devices
-    if (
-      insertRes.error &&
-      insertRes.error.message.toLowerCase().includes("lokasi")
-    ) {
-      const { lokasi: _omit, ...fallbackPayload } = payloadWithLokasi;
-      insertRes = await supabase
-        .from("devices")
-        .insert(fallbackPayload)
-        .select()
-        .single();
-    }
+      .maybeSingle();
 
     setSubmitting(false);
 
-    if (insertRes.error || !insertRes.data) {
+    if (claimErr || !updatedDev) {
       setErrorMsg(
-        "Gagal membuat kode alat: " +
-          (insertRes.error?.message || "Terjadi kesalahan"),
+        claimErr
+          ? "Gagal menghubungkan perangkat: " + claimErr.message
+          : "Perangkat baru saja diklaim oleh akun lain. Silakan periksa kembali kode perangkat.",
       );
       return;
     }
 
-    setGeneratedCreds({
-      id: insertRes.data.id,
-      key: rawApiKey,
-      nama: insertRes.data.nama,
+    setClaimedDeviceInfo({
+      id: updatedDev.id,
+      nama: updatedDev.nama,
+      claimCode: updatedDev.claim_code || claimCodeInput,
     });
     testStartRef.current = Date.now();
     setTestState("waiting");
     loadDevices();
   };
 
-  const handleCopy = (field: "id" | "key", value: string) => {
-    navigator.clipboard.writeText(value);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
-  const handleStartTestNow = () => {
-    if (!generatedCreds) return;
+  const handleRetryTest = () => {
+    if (!claimedDeviceInfo) return;
     setFirstPacket(null);
     testStartRef.current = Date.now();
     setTestState("waiting");
   };
 
-  const handleDelete = async (dev: DeviceRow) => {
+  // Lepas klaim perangkat (Unbind -> user_id = NULL) agar QR Code bisa dipakai ulang akun lain
+  const handleUnbindDevice = async (dev: DeviceRow) => {
+    const codeLabel = dev.claim_code ? ` (${dev.claim_code})` : "";
     if (
       !confirm(
-        `Hapus perangkat "${dev.nama}" beserta seluruh riwayat bacaan sensornya?`,
+        `Lepaskan perangkat "${dev.nama}"${codeLabel} dari akun Anda? Stiker QR Code pada alat ini akan kembali tersedia untuk dipindai ulang.`,
       )
     ) {
       return;
     }
-    await supabase.from("devices").delete().eq("id", dev.id);
+
+    if (dev.claim_code) {
+      await supabase
+        .from("devices")
+        .update({
+          user_id: null,
+          nama: `Colokan Pintar (${dev.claim_code})`,
+          lokasi: null,
+        })
+        .eq("id", dev.id);
+    } else {
+      await supabase.from("devices").delete().eq("id", dev.id);
+    }
+
     loadDevices();
   };
 
@@ -373,23 +615,14 @@ export default function PerangkatPage() {
     setSavingEdit(true);
 
     const nominal = Math.min(600, Math.max(1, Number(editNominal) || 50));
-    const updatePayload: Record<string, unknown> = {
-      nama: editNama.trim(),
-      lokasi: editLokasi.trim() || null,
-      daya_nominal_w: nominal,
-    };
-
-    const res = await supabase
+    await supabase
       .from("devices")
-      .update(updatePayload)
+      .update({
+        nama: editNama.trim(),
+        lokasi: editLokasi.trim() || null,
+        daya_nominal_w: nominal,
+      })
       .eq("id", editingDevice.id);
-
-    if (res.error && res.error.message.toLowerCase().includes("lokasi")) {
-      await supabase
-        .from("devices")
-        .update({ nama: editNama.trim(), daya_nominal_w: nominal })
-        .eq("id", editingDevice.id);
-    }
 
     setSavingEdit(false);
     setEditingDevice(null);
@@ -452,9 +685,9 @@ export default function PerangkatPage() {
 
   // Stepper aktif di mode wizard
   const currentStep =
-    testState === "success" || testState === "timeout"
+    testState === "success" || testState === "timeout" || claimedDeviceInfo
       ? 3
-      : generatedCreds
+      : verifiedDevice
         ? 2
         : 1;
 
@@ -469,12 +702,10 @@ export default function PerangkatPage() {
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
             <div className="flex flex-col gap-1.5 max-w-2xl min-w-0">
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 py-0.5 text-primary-container text-xs tracking-wider uppercase font-semibold">
-                  MANAJEMEN ALAT &amp; HARDWARE
-                </span>
-                <span className="w-1.5 h-1.5 rounded-full bg-primary-container shrink-0" />
-                <span className="text-xs text-on-surface-variant font-medium">
-                  {devices.length} Modul Terpasang
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-high text-primary-container text-xs tracking-wider uppercase font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary-container shrink-0" />
+                  MANAJEMEN ALAT &amp; HARDWARE • {devices.length} Modul
+                  Terpasang
                 </span>
               </div>
               <h1 className="font-extrabold text-2xl sm:text-3xl lg:text-[34px] text-on-surface tracking-tight leading-tight">
@@ -500,7 +731,7 @@ export default function PerangkatPage() {
                 </div>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-surface-container-low border border-outline-variant/60 text-on-surface text-xs font-medium shadow-2xs">
                   <span className="material-symbols-outlined text-[16px] text-primary-container shrink-0">
-                    power
+                    qr_code_2
                   </span>
                   <span>
                     Kapasitas Terpakai:{" "}
@@ -520,9 +751,9 @@ export default function PerangkatPage() {
                 className="w-full sm:w-auto min-h-[48px] px-5 rounded-xl bg-primary-container text-on-primary text-sm font-semibold flex items-center justify-center gap-2 shadow-2xs hover:opacity-95 active:scale-[0.99] transition-all cursor-pointer whitespace-nowrap"
               >
                 <span className="material-symbols-outlined text-[20px]">
-                  add
+                  qr_code_scanner
                 </span>
-                <span>Tambah Perangkat</span>
+                <span>Tambah Perangkat (QR)</span>
               </button>
             </div>
           </div>
@@ -540,9 +771,9 @@ export default function PerangkatPage() {
                   Arsitektur Pemantauan Realtime
                 </h2>
                 <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
-                  Modul Sensor PZEM-004T terhubung ke Wi-Fi rumah (2.4 GHz).
-                  Pembaruan data tegangan (V), arus (A), daya (W), dan energi
-                  (kWh) dikirim secara realtime setiap 5 detik.
+                  Kredensial perangkat tertanam aman di dalam ESP32. Cukup
+                  pindai stiker QR Code pada bodi colokan pintar untuk mulai
+                  memantau tegangan (V), arus (A), daya (W), dan energi (kWh).
                 </p>
               </div>
             </div>
@@ -559,10 +790,10 @@ export default function PerangkatPage() {
               </div>
               <div className="flex flex-col px-3 py-1.5 bg-surface-container-low rounded-lg">
                 <span className="text-[11px] text-on-surface-variant uppercase tracking-wider font-semibold">
-                  Tegangan Acuan
+                  Aktivasi
                 </span>
                 <span className="text-xs text-on-surface font-semibold whitespace-nowrap">
-                  220V AC
+                  QR Code Stiker
                 </span>
               </div>
               <div className="flex flex-col px-3 py-1.5 bg-surface-container-low rounded-lg">
@@ -611,15 +842,15 @@ export default function PerangkatPage() {
               <div className="w-full bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-6 sm:p-10 flex flex-col items-center justify-center text-center shadow-2xs">
                 <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-surface-container flex items-center justify-center text-primary-container mb-4">
                   <span className="material-symbols-outlined text-[36px] sm:text-[40px]">
-                    electrical_services
+                    qr_code_scanner
                   </span>
                 </div>
                 <h3 className="font-bold text-lg sm:text-xl text-on-surface tracking-tight mb-2">
                   Belum ada perangkat terpasang
                 </h3>
                 <p className="text-xs sm:text-sm md:text-base text-on-surface-variant max-w-lg mb-6 leading-relaxed">
-                  Tambahkan perangkat pertama untuk menghubungkan modul IoT Anda
-                  dan mulai memantau daya listrik secara akurat.
+                  Pindai kode QR pada stiker colokan pintar Anda untuk
+                  menghubungkan modul IoT dan mulai memantau daya listrik.
                 </p>
                 <button
                   type="button"
@@ -627,9 +858,9 @@ export default function PerangkatPage() {
                   className="min-h-[48px] px-6 rounded-xl bg-primary-container text-on-primary text-sm font-semibold flex items-center justify-center gap-2 shadow-2xs hover:opacity-95 active:scale-[0.99] transition-all cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[20px]">
-                    add
+                    qr_code_scanner
                   </span>
-                  <span>Tambah Perangkat Pertama</span>
+                  <span>Pindai QR Perangkat Pertama</span>
                 </button>
                 <div className="flex items-center gap-1.5 mt-5 text-on-surface-variant">
                   <span className="material-symbols-outlined text-[16px] shrink-0">
@@ -649,7 +880,7 @@ export default function PerangkatPage() {
                     key={dev.id}
                     className="w-full bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-4 sm:p-5 shadow-2xs flex flex-col xl:flex-row xl:items-center justify-between gap-4 transition-all hover:shadow-sm"
                   >
-                    {/* Left: Icon + Title + Status */}
+                    {/* Left: Icon + Title + Status + QR Badge */}
                     <div className="flex items-start gap-3 min-w-0">
                       <div
                         className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
@@ -678,11 +909,19 @@ export default function PerangkatPage() {
                               Offline
                             </span>
                           )}
+                          {dev.claim_code && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary-fixed text-primary font-mono text-xs font-bold whitespace-nowrap shrink-0">
+                              <span className="material-symbols-outlined text-[13px]">
+                                qr_code_2
+                              </span>
+                              {dev.claim_code}
+                            </span>
+                          )}
                         </div>
                         <span className="text-xs sm:text-sm text-on-surface-variant">
                           Alat {index + 1} ({dev.jenis_beban || "Beban Terukur"}{" "}
-                          • Nominal {dev.daya_nominal_w || 50} W)
-                          {dev.lokasi ? ` • Lokasi: ${dev.lokasi}` : ""}
+                          - Nominal {dev.daya_nominal_w || 50} W)
+                          {dev.lokasi ? ` Lokasi: ${dev.lokasi}` : ""}
                         </span>
                       </div>
                     </div>
@@ -762,12 +1001,12 @@ export default function PerangkatPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDelete(dev)}
-                        title="Hapus Perangkat"
+                        onClick={() => handleUnbindDevice(dev)}
+                        title="Lepaskan Perangkat (QR Code dapat diklaim ulang)"
                         className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error-container/50 transition-colors cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[20px]">
-                          delete_outline
+                          link_off
                         </span>
                       </button>
 
@@ -878,7 +1117,7 @@ export default function PerangkatPage() {
         </div>
       ) : (
         /* =========================================================
-           VIEW 2: WIZARD TAMBAH PERANGKAT & UJI KONEKSI (3 LANGKAH)
+           VIEW 2: WIZARD PINDAI QR & KLAIM PERANGKAT (3 LANGKAH)
         ========================================================= */
         <div className="flex flex-col w-full max-w-[1240px] mx-auto overflow-x-hidden gap-5 sm:gap-7">
           {/* Top Navigation / Breadcrumb */}
@@ -921,17 +1160,16 @@ export default function PerangkatPage() {
             </div>
           )}
 
-          {/* Stepper Tracker */}
+          {/* Stepper Tracker (Selaras dengan Stitch) */}
           <div className="w-full bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-4 sm:p-5 shadow-2xs">
             <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0">
-              {/* Background Connecting Line for Desktop */}
               <div className="hidden md:block absolute left-12 right-12 top-1/2 -translate-y-1/2 h-1 bg-surface-container-high z-0">
                 <div
                   className="h-full bg-primary-container transition-all duration-500"
                   style={{
                     width:
                       currentStep === 1
-                        ? "15%"
+                        ? "25%"
                         : currentStep === 2
                           ? "65%"
                           : "100%",
@@ -942,14 +1180,20 @@ export default function PerangkatPage() {
               {/* Step 1 Indicator */}
               <div className="relative z-10 flex items-center gap-3 bg-surface-container-lowest md:pr-4">
                 <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-bold text-base shadow-2xs shrink-0">
-                  1
+                  {verifiedDevice ? (
+                    <span className="material-symbols-outlined text-[20px]">
+                      check
+                    </span>
+                  ) : (
+                    "1"
+                  )}
                 </div>
                 <div className="flex flex-col">
                   <span className="text-xs sm:text-sm text-on-surface font-bold">
-                    Isi Data Perangkat
+                    Pindai QR / Kode Alat
                   </span>
                   <span className="text-xs text-on-surface-variant">
-                    Spesifikasi &amp; lokasi
+                    Kamera &amp; kode stiker
                   </span>
                 </div>
               </div>
@@ -963,14 +1207,20 @@ export default function PerangkatPage() {
                       : "bg-surface-container-high text-on-surface-variant"
                   }`}
                 >
-                  2
+                  {claimedDeviceInfo ? (
+                    <span className="material-symbols-outlined text-[20px]">
+                      check
+                    </span>
+                  ) : (
+                    "2"
+                  )}
                 </div>
                 <div className="flex flex-col">
                   <span className="text-xs sm:text-sm text-on-surface font-bold">
-                    Pasang Kode IoT
+                    Identitas Perangkat
                   </span>
                   <span className="text-xs text-on-surface-variant">
-                    Kunci &amp; sketch ESP32
+                    Nama, tipe &amp; lokasi
                   </span>
                 </div>
               </div>
@@ -1002,7 +1252,7 @@ export default function PerangkatPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-7 items-start">
             {/* LEFT COLUMN: Step 1 & Step 2 */}
             <div className="lg:col-span-7 flex flex-col gap-5 sm:gap-7 min-w-0">
-              {/* STEP 1 CARD */}
+              {/* STEP 1 CARD: QR SCANNER & MANUAL CODE */}
               <section className="bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-4 sm:p-6 lg:p-7 shadow-2xs flex flex-col gap-4 sm:gap-5">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -1010,16 +1260,197 @@ export default function PerangkatPage() {
                       Langkah 1
                     </span>
                     <h2 className="font-bold text-base sm:text-lg text-on-surface truncate">
-                      Identifikasi Perangkat Baru
+                      Pindai QR Code Perangkat
                     </h2>
                   </div>
-                  <span className="material-symbols-outlined text-on-surface-variant text-[22px] shrink-0">
-                    tune
+                  <span className="material-symbols-outlined text-primary-container text-[22px] shrink-0">
+                    qr_code_scanner
                   </span>
                 </div>
 
+                <p className="text-xs sm:text-sm md:text-base text-on-surface-variant leading-relaxed">
+                  Arahkan kamera ke kode QR pada stiker colokan pintar atau
+                  ketik kode manual.
+                </p>
+
+                {/* Camera Viewfinder Box */}
+                <div className="relative w-full rounded-xl bg-surface-container-low border border-outline-variant/60 p-5 sm:p-6 flex flex-col items-center justify-center text-center overflow-hidden min-h-[220px]">
+                  {/* Corner Guide Ticks */}
+                  <div className="absolute top-3 left-3 w-6 h-6 border-t-2 border-l-2 border-primary-container rounded-tl z-10 pointer-events-none" />
+                  <div className="absolute top-3 right-3 w-6 h-6 border-t-2 border-r-2 border-primary-container rounded-tr z-10 pointer-events-none" />
+                  <div className="absolute bottom-3 left-3 w-6 h-6 border-b-2 border-l-2 border-primary-container rounded-bl z-10 pointer-events-none" />
+                  <div className="absolute bottom-3 right-3 w-6 h-6 border-b-2 border-r-2 border-primary-container rounded-br z-10 pointer-events-none" />
+
+                  {cameraActive ? (
+                    <div className="w-full flex flex-col items-center gap-3">
+                      <div className="relative w-full max-w-sm aspect-video rounded-xl overflow-hidden bg-black shadow-sm">
+                        <video
+                          ref={videoRef}
+                          muted
+                          playsInline
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-x-6 top-1/2 h-0.5 bg-primary-container/80 animate-pulse" />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={stopCamera}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-error-container text-error text-xs sm:text-sm font-semibold cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">
+                          videocam_off
+                        </span>
+                        <span>Tutup Kamera</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="w-16 h-16 rounded-full bg-primary-container/10 text-primary-container flex items-center justify-center mb-3">
+                        <span className="material-symbols-outlined text-[32px]">
+                          qr_code_2
+                        </span>
+                      </div>
+                      <span className="text-sm font-semibold text-on-surface mb-1">
+                        Pindai Kamera Langsung
+                      </span>
+                      <p className="text-xs sm:text-sm text-on-surface-variant max-w-xs mb-4 leading-relaxed">
+                        Posisikan kode QR di dalam bingkai jendela pemindai
+                        untuk deteksi instan.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleStartCamera}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary-container text-on-primary text-xs sm:text-sm font-semibold shadow-2xs hover:opacity-95 active:scale-[0.99] transition-all cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">
+                          photo_camera
+                        </span>
+                        <span>Buka Kamera QR</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {cameraError && (
+                  <p className="text-xs text-secondary font-medium bg-secondary-fixed/40 px-3.5 py-2.5 rounded-lg">
+                    {cameraError}
+                  </p>
+                )}
+
+                {/* Divider with text */}
+                <div className="relative flex py-1 items-center">
+                  <div className="flex-grow border-t border-outline-variant/50" />
+                  <span className="flex-shrink mx-3 text-[11px] sm:text-xs text-on-surface-variant uppercase tracking-wider font-semibold text-center">
+                    atau masukkan kode pada stiker alat
+                  </span>
+                  <div className="flex-grow border-t border-outline-variant/50" />
+                </div>
+
+                {/* Manual Code Entry Input */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    htmlFor="manual_device_code"
+                    className="text-xs sm:text-sm text-on-surface font-semibold"
+                  >
+                    Kode Unik Perangkat (Stiker)
+                  </label>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <div className="relative flex-1">
+                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">
+                        sell
+                      </span>
+                      <input
+                        id="manual_device_code"
+                        type="text"
+                        value={claimCodeInput}
+                        onChange={(e) =>
+                          setClaimCodeInput(e.target.value.toUpperCase())
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            verifyClaimCode(claimCodeInput);
+                          }
+                        }}
+                        placeholder="STL-1001"
+                        className="w-full h-12 pl-10 pr-3.5 rounded-xl bg-surface-container-low border border-outline-variant/80 text-on-surface font-mono font-bold text-base sm:text-lg uppercase placeholder:font-sans placeholder:font-normal placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary-container transition-all"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={verifyingCode || !claimCodeInput.trim()}
+                      onClick={() => verifyClaimCode(claimCodeInput)}
+                      className="inline-flex items-center justify-center gap-1.5 px-5 h-12 rounded-xl bg-primary-container text-on-primary text-xs sm:text-sm font-semibold shadow-2xs hover:opacity-95 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-45 shrink-0 whitespace-nowrap"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">
+                        verified
+                      </span>
+                      <span>
+                        {verifyingCode ? "Memeriksa..." : "Verifikasi Kode"}
+                      </span>
+                    </button>
+                  </div>
+
+                  {claimStatusMsg && (
+                    <div
+                      className={`mt-1.5 p-3.5 rounded-xl text-xs sm:text-sm font-medium flex items-start gap-2.5 ${
+                        claimStatusMsg.type === "success"
+                          ? "bg-[#EFF6FF] border border-[#BFDBFE] text-[#1E40AF]"
+                          : claimStatusMsg.type === "info"
+                            ? "bg-surface-container text-on-surface"
+                            : "bg-error-container border border-error/30 text-error"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[19px] shrink-0 mt-0.5">
+                        {claimStatusMsg.type === "success"
+                          ? "check_circle"
+                          : claimStatusMsg.type === "info"
+                            ? "info"
+                            : "error"}
+                      </span>
+                      <span>{claimStatusMsg.text}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-1.5 mt-0.5 text-on-surface-variant">
+                    <span className="material-symbols-outlined text-[16px] text-primary-container shrink-0">
+                      info
+                    </span>
+                    <p className="text-xs sm:text-sm">
+                      Kode unik tertera di bagian belakang stiker modul
+                      SmartListrik.
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              {/* STEP 2 CARD: IDENTITAS PERANGKAT */}
+              <section
+                className={`bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-4 sm:p-6 lg:p-7 shadow-2xs flex flex-col gap-4 sm:gap-5 transition-opacity ${
+                  verifiedDevice ? "opacity-100" : "opacity-70"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-surface-container-high text-primary-container text-xs font-bold shrink-0 whitespace-nowrap">
+                      Langkah 2
+                    </span>
+                    <h2 className="font-bold text-base sm:text-lg text-on-surface truncate">
+                      Lengkapi Identitas Perangkat
+                    </h2>
+                  </div>
+                  <span className="material-symbols-outlined text-on-surface-variant text-[22px] shrink-0">
+                    edit_note
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm md:text-base text-on-surface-variant leading-relaxed">
+                  Beri nama dan tentukan lokasi colokan agar mudah dipantau di
+                  dashboard.
+                </p>
+
                 <form
-                  onSubmit={handleCreateCredentials}
+                  onSubmit={handleClaimAndSaveDevice}
                   className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5"
                 >
                   {/* Nama Perangkat */}
@@ -1034,14 +1465,15 @@ export default function PerangkatPage() {
                       id="device_name"
                       type="text"
                       required
+                      disabled={!verifiedDevice}
                       value={nama}
                       onChange={(e) => setNama(e.target.value)}
                       placeholder="Contoh: Kipas Angin Kamar"
-                      className="w-full h-12 px-3.5 rounded-xl bg-surface-container-low border border-outline-variant/80 text-on-surface text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-primary-container transition-all"
+                      className="w-full h-12 px-3.5 rounded-xl bg-surface-container-low border border-outline-variant/80 text-on-surface text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-primary-container transition-all disabled:opacity-50"
                     />
                   </div>
 
-                  {/* Jenis Perangkat (Custom Responsive Dropdown) */}
+                  {/* Jenis Perangkat */}
                   <div
                     ref={jenisDropdownRef}
                     className="flex flex-col gap-1.5 relative"
@@ -1051,10 +1483,11 @@ export default function PerangkatPage() {
                     </label>
                     <button
                       type="button"
+                      disabled={!verifiedDevice}
                       aria-haspopup="listbox"
                       aria-expanded={jenisDropdownOpen}
                       onClick={() => setJenisDropdownOpen((prev) => !prev)}
-                      className="w-full h-12 px-3.5 rounded-xl bg-surface-container-low border border-outline-variant/80 text-on-surface text-sm sm:text-base flex items-center justify-between gap-2 hover:bg-surface-container transition-colors cursor-pointer"
+                      className="w-full h-12 px-3.5 rounded-xl bg-surface-container-low border border-outline-variant/80 text-on-surface text-sm sm:text-base flex items-center justify-between gap-2 hover:bg-surface-container transition-colors cursor-pointer disabled:opacity-50"
                     >
                       <span className="truncate">{jenisBeban}</span>
                       <span
@@ -1069,7 +1502,7 @@ export default function PerangkatPage() {
                     {jenisDropdownOpen && (
                       <ul
                         role="listbox"
-                        className="absolute left-0 right-0 top-full mt-1.5 rounded-xl bg-surface-container-lowest border border-outline-variant/80 shadow-lg py-1.5 z-30"
+                        className="absolute left-0 right-0 top-full mt-1.5 max-h-56 overflow-y-auto rounded-xl bg-surface-container-lowest border border-outline-variant/80 shadow-lg py-1.5 z-30"
                       >
                         {JENIS_OPTIONS.map((opt) => {
                           const isSelected = opt === jenisBeban;
@@ -1106,34 +1539,81 @@ export default function PerangkatPage() {
                   </div>
 
                   {/* Lokasi Ruangan */}
-                  <div className="flex flex-col gap-1.5">
-                    <label
-                      htmlFor="device_room"
-                      className="text-xs sm:text-sm text-on-surface font-semibold"
-                    >
+                  <div
+                    ref={lokasiDropdownRef}
+                    className="flex flex-col gap-1.5 relative"
+                  >
+                    <label className="text-xs sm:text-sm text-on-surface font-semibold">
                       Lokasi Ruangan
                     </label>
-                    <input
-                      id="device_room"
-                      type="text"
-                      value={lokasi}
-                      onChange={(e) => setLokasi(e.target.value)}
-                      placeholder="Contoh: Kamar Tidur Utama"
-                      className="w-full h-12 px-3.5 rounded-xl bg-surface-container-low border border-outline-variant/80 text-on-surface text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-primary-container transition-all"
-                    />
+                    <button
+                      type="button"
+                      disabled={!verifiedDevice}
+                      aria-haspopup="listbox"
+                      aria-expanded={lokasiDropdownOpen}
+                      onClick={() => setLokasiDropdownOpen((prev) => !prev)}
+                      className="w-full h-12 px-3.5 rounded-xl bg-surface-container-low border border-outline-variant/80 text-on-surface text-sm sm:text-base flex items-center justify-between gap-2 hover:bg-surface-container transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <span className="truncate">{lokasi}</span>
+                      <span
+                        className={`material-symbols-outlined text-on-surface-variant text-[20px] shrink-0 transition-transform duration-200 ${
+                          lokasiDropdownOpen ? "rotate-180" : ""
+                        }`}
+                      >
+                        expand_more
+                      </span>
+                    </button>
+
+                    {lokasiDropdownOpen && (
+                      <ul
+                        role="listbox"
+                        className="absolute left-0 right-0 top-full mt-1.5 max-h-56 overflow-y-auto rounded-xl bg-surface-container-lowest border border-outline-variant/80 shadow-lg py-1.5 z-30"
+                      >
+                        {LOKASI_OPTIONS.map((opt) => {
+                          const isSelected = opt === lokasi;
+                          return (
+                            <li
+                              key={opt}
+                              role="option"
+                              aria-selected={isSelected}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setLokasi(opt);
+                                  setLokasiDropdownOpen(false);
+                                }}
+                                className={`w-full px-3.5 py-2.5 text-left text-xs sm:text-sm flex items-center justify-between gap-2 cursor-pointer ${
+                                  isSelected
+                                    ? "bg-primary-fixed/60 text-primary font-bold"
+                                    : "text-on-surface hover:bg-surface-container font-medium"
+                                }`}
+                              >
+                                <span className="truncate">{opt}</span>
+                                {isSelected && (
+                                  <span className="material-symbols-outlined text-[18px] text-primary shrink-0">
+                                    check
+                                  </span>
+                                )}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
                   </div>
 
-                  {/* Daya Listrik (Watt) */}
+                  {/* Daya Nominal (Watt) */}
                   <div className="flex flex-col gap-1.5 md:col-span-2">
                     <div className="flex flex-wrap items-center justify-between gap-1">
                       <label
                         htmlFor="device_wattage"
                         className="text-xs sm:text-sm text-on-surface font-semibold"
                       >
-                        Daya Listrik Perangkat (Watt)
+                        Daya Nominal (Watt)
                       </label>
                       <span className="text-xs text-on-surface-variant">
-                        Beban Resistif/Induktif
+                        Beban Uji Operasional
                       </span>
                     </div>
                     <div className="relative">
@@ -1143,9 +1623,10 @@ export default function PerangkatPage() {
                         required
                         min={1}
                         max={600}
+                        disabled={!verifiedDevice}
                         value={dayaNominal}
                         onChange={(e) => setDayaNominal(e.target.value)}
-                        className="w-full h-12 px-3.5 pr-16 rounded-xl bg-surface-container-low border border-outline-variant/80 text-on-surface text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-primary-container transition-all"
+                        className="w-full h-12 px-3.5 pr-16 rounded-xl bg-surface-container-low border border-outline-variant/80 text-on-surface text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-primary-container transition-all disabled:opacity-50"
                       />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs sm:text-sm text-on-surface-variant font-bold">
                         Watt
@@ -1153,171 +1634,33 @@ export default function PerangkatPage() {
                     </div>
                     <div className="flex items-start gap-1.5 mt-1 text-on-surface-variant">
                       <span className="material-symbols-outlined text-[18px] text-primary-container shrink-0 mt-0.5">
-                        info
+                        shield
                       </span>
                       <p className="text-xs sm:text-sm leading-relaxed">
-                        Maksimal 600 W untuk pengujian aman beban uji pada
-                        stopkontak sensor rumah tangga.
+                        Beban Maks. 600 W untuk pengujian aman stopkontak rumah
+                        tangga.
                       </p>
                     </div>
                   </div>
 
-                  {/* Action Button Step 1 */}
+                  {/* Primary CTA Step 2 */}
                   <div className="md:col-span-2 pt-1">
                     <button
                       type="submit"
-                      disabled={submitting}
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 h-12 rounded-xl bg-primary-container text-on-primary text-sm font-semibold shadow-2xs hover:opacity-95 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
+                      disabled={!verifiedDevice || submitting}
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 h-12 rounded-xl bg-primary-container text-on-primary text-sm font-semibold shadow-2xs hover:opacity-95 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-45"
                     >
                       <span>
-                        {submitting ? "Membuat Kode Alat..." : "Buat Kode Alat"}
+                        {submitting
+                          ? "Menghubungkan Perangkat..."
+                          : "Simpan & Hubungkan Perangkat"}
                       </span>
                       <span className="material-symbols-outlined text-[20px]">
-                        arrow_forward
+                        wifi
                       </span>
                     </button>
                   </div>
                 </form>
-              </section>
-
-              {/* STEP 2 CARD */}
-              <section className="bg-surface-container-lowest border border-outline-variant/70 rounded-xl p-4 sm:p-6 lg:p-7 shadow-2xs flex flex-col gap-4 sm:gap-5">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-surface-container-high text-primary-container text-xs font-bold shrink-0 whitespace-nowrap">
-                      Langkah 2
-                    </span>
-                    <h2 className="font-bold text-base sm:text-lg text-on-surface truncate">
-                      Pasang Kredensial ke Program ESP32
-                    </h2>
-                  </div>
-                  <span className="material-symbols-outlined text-on-surface-variant text-[22px] shrink-0">
-                    terminal
-                  </span>
-                </div>
-
-                <p className="text-xs sm:text-sm md:text-base text-on-surface-variant leading-relaxed">
-                  Masukkan pasangan parameter berikut ke berkas kode konfigurasi
-                  sketch Arduino/ESP32 Anda:
-                </p>
-
-                {/* Credentials Fields */}
-                <div className="flex flex-col gap-3.5">
-                  {/* Device ID */}
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
-                      ID Perangkat (device_id)
-                    </span>
-                    <div className="flex items-center rounded-xl bg-surface-container-low border border-outline-variant/70 p-1.5 gap-2">
-                      <input
-                        readOnly
-                        type="text"
-                        value={
-                          generatedCreds
-                            ? generatedCreds.id
-                            : "Isi Langkah 1 untuk menghasilkan ID..."
-                        }
-                        className="bg-transparent flex-1 min-w-0 px-2.5 text-xs sm:text-sm md:text-base text-on-surface font-mono tracking-wide focus:outline-none select-all"
-                      />
-                      <button
-                        type="button"
-                        disabled={!generatedCreds}
-                        onClick={() =>
-                          generatedCreds && handleCopy("id", generatedCreds.id)
-                        }
-                        className="inline-flex items-center gap-1.5 px-3.5 h-10 rounded-lg bg-surface-container-lowest border border-outline-variant/60 text-on-surface text-xs sm:text-sm font-semibold hover:bg-surface-container-high shadow-2xs transition-all cursor-pointer disabled:opacity-40 shrink-0 whitespace-nowrap"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">
-                          {copiedField === "id" ? "check" : "content_copy"}
-                        </span>
-                        <span>
-                          {copiedField === "id" ? "Tersalin" : "Salin"}
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Secret Key */}
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-on-surface-variant uppercase tracking-wider font-semibold">
-                      Kunci Alat (Device Secret Key)
-                    </span>
-                    <div className="flex items-center rounded-xl bg-surface-container-low border border-outline-variant/70 p-1.5 gap-1.5">
-                      <input
-                        readOnly
-                        type={
-                          generatedCreds && !showSecretKey ? "password" : "text"
-                        }
-                        value={
-                          generatedCreds
-                            ? generatedCreds.key
-                            : "Isi Langkah 1 untuk menghasilkan Kunci..."
-                        }
-                        className="bg-transparent flex-1 min-w-0 px-2.5 text-xs sm:text-sm md:text-base text-on-surface font-mono tracking-wide focus:outline-none select-all"
-                      />
-                      {generatedCreds && (
-                        <button
-                          type="button"
-                          onClick={() => setShowSecretKey((prev) => !prev)}
-                          title="Tampilkan / Sembunyikan Kunci"
-                          className="p-2 text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer shrink-0"
-                        >
-                          <span className="material-symbols-outlined text-[20px]">
-                            {showSecretKey ? "visibility_off" : "visibility"}
-                          </span>
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        disabled={!generatedCreds}
-                        onClick={() =>
-                          generatedCreds &&
-                          handleCopy("key", generatedCreds.key)
-                        }
-                        className="inline-flex items-center gap-1.5 px-3.5 h-10 rounded-lg bg-surface-container-lowest border border-outline-variant/60 text-on-surface text-xs sm:text-sm font-semibold hover:bg-surface-container-high shadow-2xs transition-all cursor-pointer disabled:opacity-40 shrink-0 whitespace-nowrap"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">
-                          {copiedField === "key" ? "check" : "content_copy"}
-                        </span>
-                        <span>
-                          {copiedField === "key" ? "Tersalin" : "Salin"}
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Warning Callout Soft Amber */}
-                <div className="flex items-start gap-3 p-4 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] text-[#92400E]">
-                  <span className="material-symbols-outlined text-[22px] text-[#92400E] shrink-0 mt-0.5">
-                    warning
-                  </span>
-                  <div className="flex flex-col gap-0.5 min-w-0">
-                    <span className="text-xs sm:text-sm font-bold">
-                      Peringatan Keamanan Kunci
-                    </span>
-                    <p className="text-xs sm:text-sm leading-relaxed">
-                      Kunci ini hanya ditampilkan satu kali. Salin dan masukkan
-                      ke program ESP32 sebelum menutup halaman ini demi
-                      melindungi integritas data meter Anda.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Action Button Step 2 */}
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    disabled={!generatedCreds}
-                    onClick={handleStartTestNow}
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 h-12 rounded-xl bg-primary-container text-on-primary text-sm font-semibold shadow-2xs hover:opacity-95 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-40"
-                  >
-                    <span>Uji Koneksi Sekarang</span>
-                    <span className="material-symbols-outlined text-[20px]">
-                      bolt
-                    </span>
-                  </button>
-                </div>
               </section>
             </div>
 
@@ -1351,13 +1694,13 @@ export default function PerangkatPage() {
                         Siap Menguji
                       </span>
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface text-xs font-semibold">
-                        Menunggu Langkah 1
+                        Menunggu Langkah 1 &amp; 2
                       </span>
                     </div>
                     <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed pt-1">
-                      Lengkapi formulir di <strong>Langkah 1</strong> untuk
-                      membuat kode alat, lalu sistem otomatis mendengarkan paket
-                      telemetri pertama dari ESP32 Anda.
+                      Pindai QR Code pada <strong>Langkah 1</strong> dan simpan
+                      identitas perangkat di <strong>Langkah 2</strong> untuk
+                      memulai validasi sinyal sensor secara otomatis.
                     </p>
                   </div>
                 )}
@@ -1386,8 +1729,13 @@ export default function PerangkatPage() {
                         </h3>
                         <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
                           Mendengarkan transmisi paket dari modul PZEM-004T
-                          untuk <strong>{generatedCreds?.nama}</strong>{" "}
-                          (biasanya 5–15 detik setelah ESP32 menyala)...
+                          untuk{" "}
+                          <strong>
+                            {claimedDeviceInfo?.nama} (
+                            {claimedDeviceInfo?.claimCode})
+                          </strong>{" "}
+                          (biasanya 5–15 detik setelah colokan terhubung ke
+                          Wi-Fi)...
                         </p>
                       </div>
                     </div>
@@ -1480,7 +1828,8 @@ export default function PerangkatPage() {
                           1
                         </span>
                         <span className="text-xs sm:text-sm text-on-surface">
-                          Cek koneksi Wi-Fi 2.4 GHz di dekat stopkontak
+                          Cek koneksi Wi-Fi 2.4 GHz pada portal Wi-Fi colokan
+                          pintar
                         </span>
                       </div>
                       <div className="flex items-start gap-2">
@@ -1488,7 +1837,8 @@ export default function PerangkatPage() {
                           2
                         </span>
                         <span className="text-xs sm:text-sm text-on-surface">
-                          Cek Kunci Alat (API Key) dan Device ID di sketch ESP32
+                          Pastikan colokan pintar sudah mendapat daya listrik
+                          PLN
                         </span>
                       </div>
                       <div className="flex items-start gap-2">
@@ -1506,7 +1856,7 @@ export default function PerangkatPage() {
                     <div className="mt-1 pt-1">
                       <button
                         type="button"
-                        onClick={handleStartTestNow}
+                        onClick={handleRetryTest}
                         className="w-full inline-flex items-center justify-center gap-2 px-4 h-11 rounded-xl bg-surface-container-lowest text-on-surface text-xs sm:text-sm font-semibold hover:bg-surface-container-high shadow-2xs transition-all cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[18px]">
@@ -1541,5 +1891,19 @@ export default function PerangkatPage() {
         </div>
       )}
     </AppShell>
+  );
+}
+
+export default function PerangkatPage() {
+  return (
+    <Suspense
+      fallback={
+        <AppShell>
+          <div className="h-64 rounded-xl bg-surface-container-lowest border border-outline-variant/60 animate-pulse" />
+        </AppShell>
+      }
+    >
+      <PerangkatContent />
+    </Suspense>
   );
 }

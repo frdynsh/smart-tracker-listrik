@@ -232,11 +232,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-on-surface-variant text-xs font-semibold whitespace-nowrap">
-              <span className="w-2 h-2 rounded-full bg-primary-container" />
-              Pemantauan Aktif
-            </span>
+          <div className="flex items-center gap-3 shrink-0">            
             <Link
               href="/pengingat"
               title="Notifikasi Peringatan"
