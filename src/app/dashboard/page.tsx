@@ -817,7 +817,7 @@ export default function DashboardPage() {
                                   )}
                                   <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-error-container text-error inline-flex items-center gap-1 shrink-0">
                                     <span className="w-1.5 h-1.5 rounded-full bg-error" />
-                                    Terputus (Offline)
+                                    Offline
                                   </span>
                                 </div>
                                 <p className="text-xs text-error font-semibold mt-1 leading-snug">
@@ -871,8 +871,12 @@ export default function DashboardPage() {
                             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                               <span className="text-sm font-bold text-on-surface break-words">
                                 {dev.nama}
-                                {dev.lokasi ? ` (${dev.lokasi})` : ""}
                               </span>
+                              {dev.lokasi && (
+                                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-surface-container-highest text-on-surface">
+                                  {dev.lokasi}
+                                </span>
+                              )}
                               {isActiveDraw ? (
                                 <span className="bg-[#EFF6FF] text-primary-container border border-[#BFDBFE] font-semibold px-2 py-0.5 rounded text-xs shrink-0 whitespace-nowrap">
                                   Menyala Normal

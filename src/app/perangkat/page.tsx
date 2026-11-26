@@ -924,7 +924,7 @@ function PerangkatContent() {
                         <span className="text-xs sm:text-sm text-on-surface-variant">
                           Alat {index + 1} ({dev.jenis_beban || "Beban Terukur"}{" "}
                           • Nominal {dev.daya_nominal_w || 50} W)
-                          {dev.lokasi ? ` • Lokasi: ${dev.lokasi}` : ""}
+                          {dev.lokasi ? ` Lokasi: ${dev.lokasi}` : ""}
                         </span>
                       </div>
                     </div>
