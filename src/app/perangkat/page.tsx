@@ -469,10 +469,12 @@ export default function PerangkatPage() {
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
             <div className="flex flex-col gap-1.5 max-w-2xl min-w-0">
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-high text-primary-container text-xs tracking-wider uppercase font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary-container shrink-0" />
-                  MANAJEMEN ALAT &amp; HARDWARE • {devices.length} Modul
-                  Terpasang
+                <span className="inline-flex items-center gap-1.5 py-0.5 text-primary-container text-xs tracking-wider uppercase font-semibold">
+                  MANAJEMEN ALAT &amp; HARDWARE
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-container shrink-0" />
+                <span className="text-xs text-on-surface-variant font-medium">
+                  {devices.length} Modul Terpasang
                 </span>
               </div>
               <h1 className="font-extrabold text-2xl sm:text-3xl lg:text-[34px] text-on-surface tracking-tight leading-tight">

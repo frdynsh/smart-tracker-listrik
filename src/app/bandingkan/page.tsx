@@ -398,7 +398,7 @@ export default function BandingkanPage() {
               <span className="text-xs font-bold text-primary-container tracking-wide uppercase">
                 Analisis &amp; Komparasi
               </span>
-              <span className="text-outline-variant">•</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-primary-container shrink-0" />
               <span className="text-xs text-on-surface-variant font-medium">
                 {devices.length} Perangkat Terpasang
               </span>
@@ -554,16 +554,6 @@ export default function BandingkanPage() {
               </span>
               <span className="whitespace-nowrap">
                 Minggu Ini vs Minggu Lalu
-              </span>
-            </div>
-
-            {/* Data Status Pill */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-high text-on-surface-variant border border-outline-variant/80 text-xs font-medium whitespace-nowrap">
-              <span className="material-symbols-outlined text-[15px] shrink-0">
-                {hasRealData ? "sensors" : "info"}
-              </span>
-              <span>
-                {hasRealData ? "Data sensor terukur" : "Menunggu data historis"}
               </span>
             </div>
           </div>

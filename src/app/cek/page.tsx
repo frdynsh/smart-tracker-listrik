@@ -437,7 +437,7 @@ export default function CekPage() {
               <span className="text-xs uppercase tracking-wider text-primary-container font-bold">
                 Audit Energi Rumah Tangga
               </span>
-              <span className="text-outline-variant">•</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-primary-container shrink-0" />
               <span className="text-xs text-on-surface-variant font-medium">
                 {devices.length} Perangkat Terpasang
               </span>
@@ -487,13 +487,6 @@ export default function CekPage() {
               >
                 Bulan Ini
               </button>
-            </div>
-
-            <div className="w-full sm:w-auto flex items-center justify-center sm:justify-start gap-1.5 px-3 py-1.5 bg-surface-container-lowest rounded-lg text-on-surface-variant text-xs font-semibold shadow-2xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary-container shrink-0" />
-              <span className="truncate">
-                Basis Data: {devices.length} Perangkat Terpasang
-              </span>
             </div>
           </div>
         </header>
