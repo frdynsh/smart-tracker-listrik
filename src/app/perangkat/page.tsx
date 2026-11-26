@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import jsQR from "jsqr";
 import AppShell from "@/components/AppShell";
 import { createClient } from "@/lib/supabase";
 
@@ -115,6 +116,12 @@ function PerangkatContent() {
   const [editNominal, setEditNominal] = useState<string>("50");
   const [savingEdit, setSavingEdit] = useState<boolean>(false);
 
+  // State Modal Konfirmasi Lepas Perangkat (Unbind)
+  const [unbindingDevice, setUnbindingDevice] = useState<DeviceRow | null>(
+    null,
+  );
+  const [unbindingLoading, setUnbindingLoading] = useState<boolean>(false);
+
   // State Wizard Step 1: QR Scanner & Verifikasi Kode Stiker
   const [claimCodeInput, setClaimCodeInput] = useState<string>("");
   const [verifyingCode, setVerifyingCode] = useState<boolean>(false);
@@ -124,10 +131,11 @@ function PerangkatContent() {
     text: string;
   } | null>(null);
 
-  // State Kamera QR Live
+  // State Kamera QR Live (jsQR)
   const [cameraActive, setCameraActive] = useState<boolean>(false);
   const [cameraError, setCameraError] = useState<string>("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scanTimerRef = useRef<number | null>(null);
 
@@ -197,6 +205,7 @@ function PerangkatContent() {
       if (event.key === "Escape") {
         setJenisDropdownOpen(false);
         setLokasiDropdownOpen(false);
+        setUnbindingDevice(null);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -305,7 +314,6 @@ function PerangkatContent() {
         return;
       }
 
-      // Jika RLS menyembunyikan baris karena user_id milik akun lain, atau kode tidak ditemukan
       if (!foundDev) {
         setClaimStatusMsg({
           type: "error",
@@ -342,7 +350,7 @@ function PerangkatContent() {
         setDayaNominal(String(foundDev.daya_nominal_w));
       setClaimStatusMsg({
         type: "success",
-        text: `Kode ${normalized} terverifikasi! Unit siap diklaim. silahkan lengkapi identitas perangkat pada Langkah 2.`,
+        text: `Kode ${normalized} terverifikasi! Unit siap diklaim. Silakan lengkapi identitas perangkat pada Langkah 2.`,
       });
     },
     [supabase],
@@ -358,12 +366,12 @@ function PerangkatContent() {
     }
   }, [searchParams, verifyClaimCode]);
 
-  // Buka kamera HP/Laptop untuk memindai QR Code langsung di browser
+  // Buka kamera HP/Laptop untuk memindai QR Code universal dengan jsQR
   const handleStartCamera = async () => {
     setCameraError("");
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setCameraError(
-        "Browser tidak mendukung akses kamera langsung. Silakan masukkan kode pada stiker secara manual di bawah.",
+        "Browser tidak mendukung akses kamera atau halaman tidak dibuka lewat HTTPS. Silakan ketik kode stiker di bawah.",
       );
       return;
     }
@@ -376,44 +384,41 @@ function PerangkatContent() {
       streamRef.current = stream;
       setCameraActive(true);
 
-      // Tunggu elemen <video> terpasang lalu mulai pemindaian frame
       window.setTimeout(async () => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play().catch(() => {});
         }
 
-        const BarcodeDetectorClass = (
-          window as unknown as {
-            BarcodeDetector?: new (opts: { formats: string[] }) => {
-              detect: (
-                source: HTMLVideoElement,
-              ) => Promise<Array<{ rawValue?: string }>>;
-            };
-          }
-        ).BarcodeDetector;
-
-        if (!BarcodeDetectorClass) {
-          setCameraError(
-            "Kamera aktif, tetapi deteksi QR otomatis belum didukung di browser ini. Anda bisa memindai QR memakai kamera bawaan HP atau mengetik kode stiker di bawah.",
-          );
-          return;
+        if (!canvasRef.current) {
+          canvasRef.current = document.createElement("canvas");
         }
 
-        const detector = new BarcodeDetectorClass({ formats: ["qr_code"] });
-        scanTimerRef.current = window.setInterval(async () => {
-          if (!videoRef.current || videoRef.current.readyState < 2) return;
-          try {
-            const barcodes = await detector.detect(videoRef.current);
-            if (barcodes.length > 0 && barcodes[0].rawValue) {
-              const scannedValue = barcodes[0].rawValue;
-              stopCamera();
-              verifyClaimCode(scannedValue);
-            }
-          } catch {
-            // Abaikan error frame tunggal saat fokus kamera menyesuaikan
+        scanTimerRef.current = window.setInterval(() => {
+          const video = videoRef.current;
+          const canvas = canvasRef.current;
+          if (!video || !canvas || video.readyState < 2) return;
+
+          const width = video.videoWidth;
+          const height = video.videoHeight;
+          if (!width || !height) return;
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
+          if (!ctx) return;
+
+          ctx.drawImage(video, 0, 0, width, height);
+          const imageData = ctx.getImageData(0, 0, width, height);
+          const qrCode = jsQR(imageData.data, width, height, {
+            inversionAttempts: "dontInvert",
+          });
+
+          if (qrCode && qrCode.data) {
+            stopCamera();
+            verifyClaimCode(qrCode.data);
           }
-        }, 500);
+        }, 300);
       }, 150);
     } catch {
       setCameraError(
@@ -575,30 +580,26 @@ function PerangkatContent() {
     setTestState("waiting");
   };
 
-  // Lepas klaim perangkat (Unbind -> user_id = NULL) agar QR Code bisa dipakai ulang akun lain
-  const handleUnbindDevice = async (dev: DeviceRow) => {
-    const codeLabel = dev.claim_code ? ` (${dev.claim_code})` : "";
-    if (
-      !confirm(
-        `Lepaskan perangkat "${dev.nama}"${codeLabel} dari akun Anda? Stiker QR Code pada alat ini akan kembali tersedia untuk dipindai ulang.`,
-      )
-    ) {
-      return;
-    }
+  // Eksekusi Lepas klaim perangkat (Unbind -> user_id = NULL) dari modal konfirmasi kustom
+  const handleConfirmUnbind = async () => {
+    if (!unbindingDevice) return;
+    setUnbindingLoading(true);
 
-    if (dev.claim_code) {
+    if (unbindingDevice.claim_code) {
       await supabase
         .from("devices")
         .update({
           user_id: null,
-          nama: `Colokan Pintar (${dev.claim_code})`,
+          nama: `Colokan Pintar (${unbindingDevice.claim_code})`,
           lokasi: null,
         })
-        .eq("id", dev.id);
+        .eq("id", unbindingDevice.id);
     } else {
-      await supabase.from("devices").delete().eq("id", dev.id);
+      await supabase.from("devices").delete().eq("id", unbindingDevice.id);
     }
 
+    setUnbindingLoading(false);
+    setUnbindingDevice(null);
     loadDevices();
   };
 
@@ -701,11 +702,13 @@ function PerangkatContent() {
           {/* Header Section */}
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
             <div className="flex flex-col gap-1.5 max-w-2xl min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-high text-primary-container text-xs tracking-wider uppercase font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary-container shrink-0" />
-                  MANAJEMEN ALAT &amp; HARDWARE • {devices.length} Modul
-                  Terpasang
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs uppercase tracking-wider text-primary-container font-bold">
+                  MANAJEMEN ALAT &amp; HARDWARE
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-container shrink-0" />
+                <span className="text-xs text-on-surface-variant font-medium">
+                  {devices.length} Modul Terpasang
                 </span>
               </div>
               <h1 className="font-extrabold text-2xl sm:text-3xl lg:text-[34px] text-on-surface tracking-tight leading-tight">
@@ -920,8 +923,8 @@ function PerangkatContent() {
                         </div>
                         <span className="text-xs sm:text-sm text-on-surface-variant">
                           Alat {index + 1} ({dev.jenis_beban || "Beban Terukur"}{" "}
-                          - Nominal {dev.daya_nominal_w || 50} W)
-                          {dev.lokasi ? ` Lokasi: ${dev.lokasi}` : ""}
+                          • Nominal {dev.daya_nominal_w || 50} W)
+                          {dev.lokasi ? ` • Lokasi: ${dev.lokasi}` : ""}
                         </span>
                       </div>
                     </div>
@@ -1001,7 +1004,7 @@ function PerangkatContent() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleUnbindDevice(dev)}
+                        onClick={() => setUnbindingDevice(dev)}
                         title="Lepaskan Perangkat (QR Code dapat diklaim ulang)"
                         className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error-container/50 transition-colors cursor-pointer"
                       >
@@ -1112,6 +1115,70 @@ function PerangkatContent() {
                   </button>
                 </div>
               </form>
+            </div>
+          )}
+
+          {/* Modal Konfirmasi Lepas Perangkat (Unbind) */}
+          {unbindingDevice && (
+            <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4">
+              <div className="w-full max-w-md bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 sm:p-6 shadow-xl flex flex-col gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-error-container text-error flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[24px]">
+                      link_off
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <h3 className="font-bold text-lg text-on-surface leading-snug">
+                      Lepaskan Perangkat?
+                    </h3>
+                    <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
+                      Anda akan melepaskan{" "}
+                      <strong className="text-on-surface">
+                        {unbindingDevice.nama}
+                      </strong>
+                      {unbindingDevice.claim_code && (
+                        <>
+                          {" "}
+                          (kode{" "}
+                          <span className="font-mono font-bold text-primary">
+                            {unbindingDevice.claim_code}
+                          </span>
+                          )
+                        </>
+                      )}{" "}
+                      dari akun ini. Stiker QR Code pada alat akan kembali
+                      tersedia untuk dipindai ulang.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-surface-container">
+                  <button
+                    type="button"
+                    disabled={unbindingLoading}
+                    onClick={() => setUnbindingDevice(null)}
+                    className="min-h-[42px] px-4 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant text-xs sm:text-sm font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={unbindingLoading}
+                    onClick={handleConfirmUnbind}
+                    className="min-h-[42px] px-5 rounded-xl bg-error text-on-error text-xs sm:text-sm font-semibold shadow-2xs hover:opacity-95 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">
+                      link_off
+                    </span>
+                    <span>
+                      {unbindingLoading
+                        ? "Melepaskan..."
+                        : "Ya, Lepaskan Perangkat"}
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

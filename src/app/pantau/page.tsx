@@ -414,7 +414,7 @@ export default function PantauPage() {
               <span className="text-xs uppercase tracking-wider text-primary-container font-bold">
                 Pantauan Konsumsi Listrik
               </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-secondary-container" />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary-container shrink-0" />
               <span className="text-xs text-on-surface-variant font-medium">
                 Sinkronisasi Realtime
               </span>
