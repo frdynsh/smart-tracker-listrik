@@ -6,8 +6,9 @@ import AppShell from "@/components/AppShell";
 import { createClient } from "@/lib/supabase";
 import {
   ResponsiveContainer,
-  AreaChart,
+  ComposedChart,
   Area,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -19,6 +20,7 @@ interface Device {
   id: string;
   nama: string;
   jenis_beban?: string | null;
+  daya_nominal_w?: number | null;
   last_seen_at?: string | null;
 }
 
@@ -32,7 +34,25 @@ interface Reading {
   e_wh: number;
 }
 
+interface DeviceSeriesConfig {
+  id: string;
+  nama: string;
+  dayaNominal: number;
+  color: string;
+  dashed: boolean;
+}
+
 const OFFLINE_THRESHOLD_MS = 120_000;
+const ITEMS_PER_PAGE = 5;
+
+// Palet warna konsisten dengan Stitch untuk membedakan garis tiap perangkat
+const DEVICE_LINE_PALETTE = [
+  { color: "#0D9488", dashed: false }, // Teal (Alat 1)
+  { color: "#9B4500", dashed: false }, // Warm Amber / Secondary (Alat 2)
+  { color: "#757684", dashed: true }, // Warm Slate Dashed (Alat 3)
+  { color: "#6366F1", dashed: false }, // Indigo (Alat 4)
+  { color: "#005826", dashed: true }, // Deep Forest (Alat 5)
+];
 
 export default function PantauPage() {
   const supabase = useMemo(() => createClient(), []);
@@ -45,13 +65,13 @@ export default function PantauPage() {
   const [range, setRange] = useState<"today" | "7d">("today");
   const [unit, setUnit] = useState<"rupiah" | "kwh">("rupiah");
   const [showTable, setShowTable] = useState<boolean>(false);
+  const [tablePage, setTablePage] = useState<number>(1);
 
   const [readings, setReadings] = useState<Reading[]>([]);
   const [has30DayData, setHas30DayData] = useState<boolean>(false);
   const [tarif, setTarif] = useState<number>(1444.7);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Tutup dropdown saat klik di luar area atau menekan Escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -74,6 +94,11 @@ export default function PantauPage() {
     };
   }, []);
 
+  // Reset halaman tabel ke 1 saat filter rentang atau perangkat berubah
+  useEffect(() => {
+    setTablePage(1);
+  }, [range, selectedDevice]);
+
   const fetchPantauData = useCallback(async () => {
     const {
       data: { user },
@@ -89,7 +114,7 @@ export default function PantauPage() {
           .single(),
         supabase
           .from("devices")
-          .select("id, nama, jenis_beban, last_seen_at")
+          .select("id, nama, jenis_beban, daya_nominal_w, last_seen_at")
           .eq("user_id", user.id)
           .order("created_at", { ascending: true }),
       ]);
@@ -101,12 +126,22 @@ export default function PantauPage() {
     }
     setDevices(userDevices);
 
-    // Cek ketersediaan data > 21 hari untuk tombol 30 Hari
+    if (userDevices.length === 0) {
+      setReadings([]);
+      setHas30DayData(false);
+      setLoading(false);
+      return;
+    }
+
+    const devIds = userDevices.map((d) => d.id);
+
+    // Cek ketersediaan data > 21 hari milik perangkat user untuk tombol 30 Hari
     const twentyOneDaysAgo = new Date();
     twentyOneDaysAgo.setDate(twentyOneDaysAgo.getDate() - 21);
     const { count: oldCount } = await supabase
       .from("readings")
       .select("*", { count: "exact", head: true })
+      .in("device_id", devIds)
       .lt("ts", twentyOneDaysAgo.toISOString());
     setHas30DayData((oldCount || 0) > 0);
 
@@ -128,15 +163,12 @@ export default function PantauPage() {
 
     if (selectedDevice !== "all") {
       query = query.eq("device_id", selectedDevice);
-    } else if (userDevices.length > 0) {
-      query = query.in(
-        "device_id",
-        userDevices.map((d) => d.id),
-      );
+    } else {
+      query = query.in("device_id", devIds);
     }
 
     const { data: reads } = await query;
-    setReadings(userDevices.length > 0 ? (reads as Reading[]) || [] : []);
+    setReadings((reads as Reading[]) || []);
     setLoading(false);
   }, [supabase, range, selectedDevice]);
 
@@ -152,6 +184,25 @@ export default function PantauPage() {
     return map;
   }, [devices]);
 
+  // Konfigurasi seri warna per perangkat
+  const deviceSeriesList: DeviceSeriesConfig[] = useMemo(() => {
+    return devices.map((dev, idx) => {
+      const style = DEVICE_LINE_PALETTE[idx % DEVICE_LINE_PALETTE.length];
+      return {
+        id: dev.id,
+        nama: dev.nama,
+        dayaNominal: dev.daya_nominal_w || 50,
+        color: style.color,
+        dashed: style.dashed,
+      };
+    });
+  }, [devices]);
+
+  const activeSeriesList = useMemo(() => {
+    if (selectedDevice === "all") return deviceSeriesList;
+    return deviceSeriesList.filter((s) => s.id === selectedDevice);
+  }, [deviceSeriesList, selectedDevice]);
+
   const onlineCount = useMemo(() => {
     const now = Date.now();
     return devices.filter(
@@ -161,7 +212,7 @@ export default function PantauPage() {
     ).length;
   }, [devices]);
 
-  // Agregasi data grafik per jam (atau slot waktu)
+  // Agregasi data grafik per slot waktu (memisahkan seri tiap perangkat + total akumulasi)
   const {
     chartData,
     peakPoint,
@@ -185,7 +236,7 @@ export default function PantauPage() {
       };
     }
 
-    // Hitung energi terukur per perangkat dalam rentang terpilih
+    // 1. Hitung energi terukur kumulatif per perangkat dalam rentang terpilih
     const byDevice = new Map<string, Reading[]>();
     readings.forEach((r) => {
       const list = byDevice.get(r.device_id) || [];
@@ -195,24 +246,25 @@ export default function PantauPage() {
 
     let sumKwh = 0;
     byDevice.forEach((list) => {
-      if (list.length > 0) {
+      if (list.length > 1) {
         const deltaWh = Math.max(
           0,
           Number(list[list.length - 1].e_wh) - Number(list[0].e_wh),
         );
         sumKwh += deltaWh / 1000;
+      } else if (list.length === 1) {
+        sumKwh += Math.max(0, Number(list[0].p) / 1000);
       }
     });
 
-    // Kelompokkan pembacaan per slot waktu untuk grafik yang bersih
+    // 2. Kelompokkan pembacaan per slot waktu & per device_id
     const bucketMap = new Map<
       string,
       {
         label: string;
         sortKey: number;
-        totalWatt: number;
-        count: number;
         hourNum: number;
+        perDeviceWatt: Map<string, { sum: number; count: number }>;
       }
     >();
 
@@ -231,40 +283,62 @@ export default function PantauPage() {
           ? `${dateObj.getFullYear()}-${dateObj.getMonth()}-${dateObj.getDate()}-${dateObj.getHours()}`
           : `${dateObj.getFullYear()}-${dateObj.getMonth()}-${dateObj.getDate()}`;
 
-      const existing = bucketMap.get(key);
-      if (existing) {
-        existing.totalWatt += Number(r.p);
-        existing.count += 1;
-      } else {
-        bucketMap.set(key, {
+      let bucket = bucketMap.get(key);
+      if (!bucket) {
+        bucket = {
           label,
           sortKey: dateObj.getTime(),
-          totalWatt: Number(r.p),
-          count: 1,
           hourNum: dateObj.getHours(),
-        });
+          perDeviceWatt: new Map(),
+        };
+        bucketMap.set(key, bucket);
       }
+
+      const devAcc = bucket.perDeviceWatt.get(r.device_id) || {
+        sum: 0,
+        count: 0,
+      };
+      devAcc.sum += Number(r.p);
+      devAcc.count += 1;
+      bucket.perDeviceWatt.set(r.device_id, devAcc);
     });
 
+    // 3. Susun titik data grafik dengan kolom dinamis dev_<deviceId> + total nilai
     const formattedChart = Array.from(bucketMap.values())
       .sort((a, b) => a.sortKey - b.sortKey)
       .map((b) => {
-        const avgWatt = b.count > 0 ? b.totalWatt / b.count : 0;
-        const kwhRate = avgWatt / 1000;
-        const rpRate = Math.round(kwhRate * tarif);
-        return {
+        let totalAvgWatt = 0;
+        const point: Record<string, string | number> = {
           waktu: b.label,
-          nilai: unit === "rupiah" ? rpRate : Number(kwhRate.toFixed(3)),
-          rpRate,
-          kwhRate: Number(kwhRate.toFixed(3)),
-          watt: Math.round(avgWatt),
           hourNum: b.hourNum,
         };
+
+        activeSeriesList.forEach((ser) => {
+          const acc = b.perDeviceWatt.get(ser.id);
+          const devAvgWatt = acc && acc.count > 0 ? acc.sum / acc.count : 0;
+          totalAvgWatt += devAvgWatt;
+
+          const devKwhRate = devAvgWatt / 1000;
+          const devRpRate = Math.round(devKwhRate * tarif);
+          point[`dev_${ser.id}`] =
+            unit === "rupiah" ? devRpRate : Number(devKwhRate.toFixed(3));
+        });
+
+        const totalKwhRate = totalAvgWatt / 1000;
+        const totalRpRate = Math.round(totalKwhRate * tarif);
+
+        point.nilai =
+          unit === "rupiah" ? totalRpRate : Number(totalKwhRate.toFixed(3));
+        point.rpRate = totalRpRate;
+        point.kwhRate = Number(totalKwhRate.toFixed(3));
+        point.watt = Math.round(totalAvgWatt);
+
+        return point;
       });
 
     let maxItem = formattedChart[0] || null;
     formattedChart.forEach((item) => {
-      if (maxItem && item.nilai > maxItem.nilai) {
+      if (maxItem && Number(item.nilai) > Number(maxItem.nilai)) {
         maxItem = item;
       }
     });
@@ -274,9 +348,10 @@ export default function PantauPage() {
     const avgRp = costTotal / activeSlots;
     const avgKwh = sumKwh / activeSlots;
 
+    const peakHour = maxItem ? Number(maxItem.hourNum) : 0;
     const peakWindow = maxItem
-      ? `${String(maxItem.hourNum).padStart(2, "0")}.00 – ${String(
-          (maxItem.hourNum + 2) % 24,
+      ? `${String(peakHour).padStart(2, "0")}.00 – ${String(
+          (peakHour + 2) % 24,
         ).padStart(2, "0")}.00`
       : "-";
 
@@ -297,7 +372,23 @@ export default function PantauPage() {
       peakHourWindow: peakWindow,
       lastUpdatedText: `${latestTs} WIB`,
     };
-  }, [readings, range, tarif, unit]);
+  }, [readings, range, tarif, unit, activeSeriesList]);
+
+  // Pagination untuk tabel log sensor (terbaru di atas)
+  const reversedReadings = useMemo(() => {
+    return readings.slice().reverse();
+  }, [readings]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(reversedReadings.length / ITEMS_PER_PAGE),
+  );
+  const safeTablePage = Math.min(tablePage, totalPages);
+  const startIdx = (safeTablePage - 1) * ITEMS_PER_PAGE;
+  const paginatedReadings = reversedReadings.slice(
+    startIdx,
+    startIdx + ITEMS_PER_PAGE,
+  );
 
   const selectedDeviceObj =
     selectedDevice !== "all" ? deviceMap.get(selectedDevice) : null;
@@ -310,6 +401,9 @@ export default function PantauPage() {
       }`
     : `Semua Perangkat (${devices.length} Alat)`;
 
+  const isMultiAllView =
+    selectedDevice === "all" && activeSeriesList.length > 1;
+
   return (
     <AppShell>
       <div className="flex flex-col w-full max-w-full overflow-x-hidden gap-4 sm:gap-6">
@@ -319,6 +413,10 @@ export default function PantauPage() {
             <div className="flex flex-wrap items-center gap-2 mb-1">
               <span className="text-xs uppercase tracking-wider text-primary-container font-bold">
                 Pantauan Konsumsi Listrik
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-secondary-container" />
+              <span className="text-xs text-on-surface-variant font-medium">
+                Sinkronisasi Realtime
               </span>
             </div>
             <h1 className="font-extrabold text-2xl sm:text-3xl lg:text-[36px] leading-tight text-on-surface tracking-tight">
@@ -451,12 +549,10 @@ export default function PantauPage() {
                   </button>
                 </li>
 
-                {devices.map((d) => {
+                {devices.map((d, idx) => {
                   const isSelected = selectedDevice === d.id;
-                  const isOnline =
-                    !!d.last_seen_at &&
-                    Date.now() - new Date(d.last_seen_at).getTime() <=
-                      OFFLINE_THRESHOLD_MS;
+                  const serColor =
+                    DEVICE_LINE_PALETTE[idx % DEVICE_LINE_PALETTE.length].color;
 
                   return (
                     <li key={d.id} role="option" aria-selected={isSelected}>
@@ -474,11 +570,8 @@ export default function PantauPage() {
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <span
-                            className={`w-2 h-2 rounded-full shrink-0 ${
-                              isOnline
-                                ? "bg-primary-container"
-                                : "bg-outline-variant"
-                            }`}
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: serColor }}
                           />
                           <span className="truncate">
                             {d.nama}
@@ -551,10 +644,10 @@ export default function PantauPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="font-bold text-base sm:text-lg md:text-[22px] text-on-surface leading-snug">
                     {unit === "rupiah"
-                      ? `Grafik Estimasi Biaya (${
+                      ? `Grafik Biaya Pemakaian per Jam (${
                           range === "today" ? "Hari Ini" : "7 Hari Terakhir"
                         })`
-                      : `Grafik Konsumsi Energi (${
+                      : `Grafik Konsumsi Energi per Jam (${
                           range === "today" ? "Hari Ini" : "7 Hari Terakhir"
                         })`}
                   </h2>
@@ -563,10 +656,9 @@ export default function PantauPage() {
                   </span>
                 </div>
                 <p className="text-xs sm:text-sm text-on-surface-variant mt-0.5">
-                  Menampilkan laju pemakaian terukur dari{" "}
                   {selectedDeviceObj
-                    ? selectedDeviceObj.nama
-                    : `${devices.length} colokan terpantau`}
+                    ? `Menampilkan rincian pemakaian terukur dari ${selectedDeviceObj.nama}`
+                    : `Menampilkan pemakaian akumulatif beserta rincian tiap garis dari ${devices.length} colokan terpantau`}
                 </p>
               </div>
 
@@ -580,13 +672,13 @@ export default function PantauPage() {
               </div>
             </div>
 
-            {/* Chart Canvas Area */}
+            {/* Chart Canvas Area (Multi-Device Composed Line & Area Chart) */}
             <div className="relative w-full h-72 sm:h-80 min-w-0">
               {loading ? (
                 <div className="w-full h-full rounded-xl bg-surface-container-low animate-pulse" />
               ) : chartData.length > 0 ? (
                 <>
-                  {peakPoint && peakPoint.nilai > 0 && (
+                  {peakPoint && Number(peakPoint.nilai) > 0 && (
                     <div className="mb-3 inline-flex items-center gap-2 bg-primary text-on-primary px-3 py-1.5 rounded-lg shadow-xs text-xs font-semibold max-w-full">
                       <span className="material-symbols-outlined text-[16px] text-secondary-fixed shrink-0">
                         bolt
@@ -594,7 +686,7 @@ export default function PantauPage() {
                       <span className="truncate">
                         Puncak:{" "}
                         {unit === "rupiah"
-                          ? `Rp ${peakPoint.rpRate.toLocaleString("id-ID")} / jam`
+                          ? `Rp ${Number(peakPoint.rpRate).toLocaleString("id-ID")} / jam`
                           : `${peakPoint.kwhRate} kWh / jam`}{" "}
                         ({peakPoint.waktu})
                       </span>
@@ -602,9 +694,9 @@ export default function PantauPage() {
                   )}
 
                   <ResponsiveContainer width="100%" height="88%">
-                    <AreaChart
+                    <ComposedChart
                       data={chartData}
-                      margin={{ top: 10, right: 10, left: -14, bottom: 4 }}
+                      margin={{ top: 10, right: 12, left: -14, bottom: 4 }}
                     >
                       <defs>
                         <linearGradient
@@ -617,7 +709,12 @@ export default function PantauPage() {
                           <stop
                             offset="0%"
                             stopColor="#1e40af"
-                            stopOpacity={0.2}
+                            stopOpacity={0.18}
+                          />
+                          <stop
+                            offset="60%"
+                            stopColor="#1e40af"
+                            stopOpacity={0.05}
                           />
                           <stop
                             offset="100%"
@@ -626,6 +723,7 @@ export default function PantauPage() {
                           />
                         </linearGradient>
                       </defs>
+
                       <CartesianGrid
                         strokeDasharray="4 4"
                         stroke="#eee7e3"
@@ -642,7 +740,7 @@ export default function PantauPage() {
                         tick={{ fontSize: 11, fill: "#757684" }}
                         axisLine={false}
                         tickLine={false}
-                        width={54}
+                        width={56}
                         tickFormatter={(val) =>
                           unit === "rupiah" ? `Rp ${val}` : `${val}`
                         }
@@ -653,38 +751,80 @@ export default function PantauPage() {
                           borderColor: "#c4c5d5",
                           borderRadius: "12px",
                           fontSize: "12px",
+                          boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
                         }}
-                        formatter={(value: unknown) => [
-                          unit === "rupiah"
-                            ? `Rp ${Number(value).toLocaleString("id-ID")} / jam`
-                            : `${value} kWh / jam`,
-                          unit === "rupiah" ? "Laju Biaya" : "Laju Energi",
-                        ]}
+                        formatter={(value: unknown, name: unknown) => {
+                          const formattedVal =
+                            unit === "rupiah"
+                              ? `Rp ${Number(value).toLocaleString("id-ID")} / jam`
+                              : `${value} kWh / jam`;
+                          return [formattedVal, String(name)];
+                        }}
                       />
+
+                      {/* Garis individual per perangkat saat mode "Semua Perangkat" */}
+                      {isMultiAllView &&
+                        activeSeriesList.map((ser) => (
+                          <Line
+                            key={ser.id}
+                            type="monotone"
+                            dataKey={`dev_${ser.id}`}
+                            name={ser.nama}
+                            stroke={ser.color}
+                            strokeWidth={2.2}
+                            strokeDasharray={ser.dashed ? "5 4" : undefined}
+                            dot={false}
+                            activeDot={{
+                              r: 4.5,
+                              fill: ser.color,
+                              stroke: "#ffffff",
+                              strokeWidth: 1.5,
+                            }}
+                          />
+                        ))}
+
+                      {/* Area + Garis Utama Total Akumulasi / Perangkat Terpilih */}
                       <Area
                         type="monotone"
                         dataKey="nilai"
-                        stroke="#1e40af"
+                        name={
+                          isMultiAllView
+                            ? "Total Akumulasi (Semua Alat)"
+                            : selectedDeviceObj?.nama || "Total Pemakaian"
+                        }
+                        stroke={
+                          selectedDeviceObj && activeSeriesList[0]
+                            ? activeSeriesList[0].color
+                            : "#1e40af"
+                        }
                         fill="url(#primaryAreaGrad)"
-                        strokeWidth={3}
+                        strokeWidth={3.2}
                         activeDot={{
                           r: 6,
-                          fill: "#1e40af",
+                          fill:
+                            selectedDeviceObj && activeSeriesList[0]
+                              ? activeSeriesList[0].color
+                              : "#1e40af",
                           stroke: "#ffffff",
                           strokeWidth: 2,
                         }}
                       />
+
                       {peakPoint && (
                         <ReferenceDot
-                          x={peakPoint.waktu}
-                          y={peakPoint.nilai}
+                          x={String(peakPoint.waktu)}
+                          y={Number(peakPoint.nilai)}
                           r={6}
-                          fill="#1e40af"
+                          fill={
+                            selectedDeviceObj && activeSeriesList[0]
+                              ? activeSeriesList[0].color
+                              : "#1e40af"
+                          }
                           stroke="#ffffff"
                           strokeWidth={2}
                         />
                       )}
-                    </AreaChart>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </>
               ) : (
@@ -703,26 +843,74 @@ export default function PantauPage() {
               )}
             </div>
 
-            {/* Chart Detailed Legend Bar */}
+            {/* Chart Detailed Legend Bar (Selaras Stitch) */}
             <div className="pt-4 border-t border-surface-container flex flex-wrap items-center justify-between gap-3 sm:gap-4">
-              <div className="flex flex-wrap items-center gap-2 min-w-0">
-                <span className="w-3.5 h-3.5 rounded-full bg-primary-container shrink-0" />
-                <span className="text-xs sm:text-sm text-on-surface font-bold">
-                  {selectedDeviceObj
-                    ? selectedDeviceObj.nama
-                    : "Semua Perangkat Terpantau"}
-                </span>
-                <span className="text-xs text-on-surface-variant font-medium">
-                  ({readings.length} titik pembacaan)
-                </span>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 min-w-0">
+                {/* Total / Selected Primary Legend */}
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-3.5 h-3.5 rounded-full shrink-0"
+                    style={{
+                      backgroundColor:
+                        selectedDeviceObj && activeSeriesList[0]
+                          ? activeSeriesList[0].color
+                          : "#1e40af",
+                    }}
+                  />
+                  <span className="text-xs sm:text-sm text-on-surface font-bold">
+                    {selectedDeviceObj
+                      ? selectedDeviceObj.nama
+                      : "Total Akumulasi"}
+                  </span>
+                  <span className="text-xs text-on-surface-variant font-medium">
+                    {selectedDeviceObj
+                      ? `• ${selectedDeviceObj.daya_nominal_w || 50} Watt`
+                      : "(Semua Alat)"}
+                  </span>
+                </div>
+
+                {/* Daftar Legenda Warna Tiap Perangkat saat mode "Semua Perangkat" */}
+                {isMultiAllView && (
+                  <>
+                    <div className="h-4 w-px bg-outline-variant/50 hidden sm:block" />
+                    {activeSeriesList.map((ser) => (
+                      <button
+                        key={ser.id}
+                        type="button"
+                        onClick={() => setSelectedDevice(ser.id)}
+                        title={`Klik untuk fokus ke ${ser.nama}`}
+                        className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
+                      >
+                        {ser.dashed ? (
+                          <span
+                            className="w-4 h-0 border-t-2 border-dashed shrink-0"
+                            style={{ borderColor: ser.color }}
+                          />
+                        ) : (
+                          <span
+                            className="w-3 h-3 rounded-full shrink-0"
+                            style={{ backgroundColor: ser.color }}
+                          />
+                        )}
+                        <span className="text-xs sm:text-sm text-on-surface font-medium">
+                          {ser.nama}
+                        </span>
+                        <span className="text-xs text-on-surface-variant">
+                          • {ser.dayaNominal} Watt
+                        </span>
+                      </button>
+                    ))}
+                  </>
+                )}
               </div>
 
+              {/* Quick Explanation Tag */}
               <div className="flex items-center gap-1.5 text-on-surface-variant">
                 <span className="material-symbols-outlined text-[17px] text-secondary shrink-0">
                   info
                 </span>
                 <span className="text-xs font-semibold">
-                  Tarif dasar terpakai: Rp{" "}
+                  Tarif dasar R-1/TR: Rp{" "}
                   {tarif.toLocaleString("id-ID", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
@@ -733,7 +921,7 @@ export default function PantauPage() {
             </div>
           </div>
         ) : (
-          /* MODE TABEL LOG SENSOR PZEM-004T */
+          /* MODE TABEL LOG SENSOR PZEM-004T DENGAN PAGINATION */
           <div className="w-full bg-surface-container-lowest border border-outline-variant/70 rounded-xl shadow-2xs overflow-hidden">
             <div className="p-4 sm:p-5 border-b border-outline-variant/50 flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -775,7 +963,7 @@ export default function PantauPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/40">
-                  {readings.length === 0 ? (
+                  {paginatedReadings.length === 0 ? (
                     <tr>
                       <td
                         colSpan={6}
@@ -785,41 +973,91 @@ export default function PantauPage() {
                       </td>
                     </tr>
                   ) : (
-                    readings
-                      .slice()
-                      .reverse()
-                      .map((r) => {
-                        const dev = deviceMap.get(r.device_id);
-                        return (
-                          <tr
-                            key={r.id}
-                            className="hover:bg-surface-container-low/60 transition-colors"
-                          >
-                            <td className="px-4 sm:px-5 py-3 whitespace-nowrap text-on-surface">
-                              {new Date(r.ts).toLocaleString("id-ID")}
-                            </td>
-                            <td className="px-4 sm:px-5 py-3 font-semibold text-on-surface whitespace-nowrap">
-                              {dev?.nama || "Perangkat IoT"}
-                            </td>
-                            <td className="px-4 sm:px-5 py-3 text-on-surface-variant whitespace-nowrap">
-                              {Number(r.v).toFixed(1)} V
-                            </td>
-                            <td className="px-4 sm:px-5 py-3 text-on-surface-variant whitespace-nowrap">
-                              {Number(r.i).toFixed(2)} A
-                            </td>
-                            <td className="px-4 sm:px-5 py-3 font-bold text-primary-container whitespace-nowrap">
-                              {Number(r.p).toFixed(1)} W
-                            </td>
-                            <td className="px-4 sm:px-5 py-3 text-on-surface-variant whitespace-nowrap">
-                              {Number(r.e_wh).toFixed(1)} Wh
-                            </td>
-                          </tr>
-                        );
-                      })
+                    paginatedReadings.map((r) => {
+                      const dev = deviceMap.get(r.device_id);
+                      return (
+                        <tr
+                          key={r.id}
+                          className="hover:bg-surface-container-low/60 transition-colors"
+                        >
+                          <td className="px-4 sm:px-5 py-3 whitespace-nowrap text-on-surface">
+                            {new Date(r.ts).toLocaleString("id-ID")}
+                          </td>
+                          <td className="px-4 sm:px-5 py-3 font-semibold text-on-surface whitespace-nowrap">
+                            {dev?.nama || "Perangkat IoT"}
+                          </td>
+                          <td className="px-4 sm:px-5 py-3 text-on-surface-variant whitespace-nowrap">
+                            {Number(r.v).toFixed(1)} V
+                          </td>
+                          <td className="px-4 sm:px-5 py-3 text-on-surface-variant whitespace-nowrap">
+                            {Number(r.i).toFixed(2)} A
+                          </td>
+                          <td className="px-4 sm:px-5 py-3 font-bold text-primary-container whitespace-nowrap">
+                            {Number(r.p).toFixed(1)} W
+                          </td>
+                          <td className="px-4 sm:px-5 py-3 text-on-surface-variant whitespace-nowrap">
+                            {Number(r.e_wh).toFixed(1)} Wh
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Footer Controls */}
+            {reversedReadings.length > ITEMS_PER_PAGE && (
+              <div className="px-4 sm:px-5 py-3.5 bg-surface-container-low/60 border-t border-outline-variant/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <span className="text-xs text-on-surface-variant font-medium">
+                  Menampilkan{" "}
+                  <strong className="text-on-surface">{startIdx + 1}</strong>–
+                  <strong className="text-on-surface">
+                    {Math.min(
+                      startIdx + ITEMS_PER_PAGE,
+                      reversedReadings.length,
+                    )}
+                  </strong>{" "}
+                  dari{" "}
+                  <strong className="text-on-surface">
+                    {reversedReadings.length}
+                  </strong>{" "}
+                  catatan
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={safeTablePage <= 1}
+                    onClick={() => setTablePage((p) => Math.max(1, p - 1))}
+                    className="min-h-[36px] px-3 py-1.5 rounded-lg bg-surface-container-lowest border border-outline-variant/70 text-xs font-semibold text-on-surface hover:bg-surface-container disabled:opacity-45 disabled:cursor-not-allowed inline-flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">
+                      chevron_left
+                    </span>
+                    <span>Sebelumnya</span>
+                  </button>
+
+                  <span className="px-2.5 text-xs font-semibold text-on-surface-variant whitespace-nowrap">
+                    Halaman {safeTablePage} / {totalPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled={safeTablePage >= totalPages}
+                    onClick={() =>
+                      setTablePage((p) => Math.min(totalPages, p + 1))
+                    }
+                    className="min-h-[36px] px-3 py-1.5 rounded-lg bg-surface-container-lowest border border-outline-variant/70 text-xs font-semibold text-on-surface hover:bg-surface-container disabled:opacity-45 disabled:cursor-not-allowed inline-flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <span>Berikutnya</span>
+                    <span className="material-symbols-outlined text-[16px]">
+                      chevron_right
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
