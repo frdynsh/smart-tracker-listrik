@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/supabase";
 
 interface DeviceOption {
   id: string;
@@ -84,7 +84,6 @@ export default function HematPage() {
   const supabase = useMemo(() => createClient(), []);
 
   const [tarif, setTarif] = useState<number>(1444.7);
-  const [golongan, setGolongan] = useState<string>("900 VA");
   const [targetRp, setTargetRp] = useState<number>(48600);
   const [editingTarget, setEditingTarget] = useState<boolean>(false);
   const [targetInput, setTargetInput] = useState<string>("48600");
@@ -134,42 +133,28 @@ export default function HematPage() {
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const [
-      { data: profile },
-      { data: budgetRule },
-      { data: devsData },
-      { data: readsData },
-    ] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("tarif_per_kwh, golongan_daya")
-        .eq("id", user.id)
-        .single(),
-      supabase
-        .from("user_thresholds")
-        .select("ambang")
-        .eq("user_id", user.id)
-        .eq("tipe", "estimasi_biaya")
-        .single(),
-      supabase
-        .from("devices")
-        .select("id, nama, jenis_beban, lokasi")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("readings")
-        .select("device_id, ts, p, e_wh")
-        .gte("ts", startOfMonth.toISOString())
-        .order("ts", { ascending: true })
-        .limit(1500),
-    ]);
+    const [{ data: profile }, { data: budgetRule }, { data: devsData }] =
+      await Promise.all([
+        supabase
+          .from("profiles")
+          .select("tarif_per_kwh")
+          .eq("id", user.id)
+          .single(),
+        supabase
+          .from("user_thresholds")
+          .select("ambang")
+          .eq("user_id", user.id)
+          .eq("tipe", "estimasi_biaya")
+          .single(),
+        supabase
+          .from("devices")
+          .select("id, nama, jenis_beban, lokasi")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: true }),
+      ]);
 
     if (profile?.tarif_per_kwh) {
       setTarif(Number(profile.tarif_per_kwh));
-    }
-    if (profile?.golongan_daya) {
-      const match = String(profile.golongan_daya).match(/\d+\s*VA/i);
-      setGolongan(match ? match[0].toUpperCase() : profile.golongan_daya);
     }
     if (budgetRule?.ambang) {
       const val = Number(budgetRule.ambang);
@@ -177,11 +162,21 @@ export default function HematPage() {
       setTargetInput(String(val));
     }
 
-    const reads = (readsData as ReadingRow[]) || [];
     const devs = devsData || [];
 
     if (devs.length > 0) {
+      const devIds = devs.map((d) => d.id);
+      const { data: readsData } = await supabase
+        .from("readings")
+        .select("device_id, ts, p, e_wh")
+        .in("device_id", devIds)
+        .gte("ts", startOfMonth.toISOString())
+        .order("ts", { ascending: true })
+        .limit(5000);
+
+      const reads = (readsData as ReadingRow[]) || [];
       let totalMonthKwh = 0;
+
       const mappedOptions: DeviceOption[] = devs.map((d) => {
         const dReads = reads.filter((r) => r.device_id === d.id);
         if (dReads.length > 1) {
@@ -403,7 +398,7 @@ export default function HematPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl bg-surface-container-low">
             <div className="flex flex-wrap items-center gap-2.5 min-w-0">
               <span className="px-2.5 py-1 rounded bg-primary-fixed text-primary text-xs font-bold tracking-wide shrink-0 whitespace-nowrap">
-                {golongan}
+                Target Bulanan
               </span>
               <span className="text-xs sm:text-sm md:text-base text-on-surface font-medium">
                 Batas anggaran pengeluaran listrik bulanan (maksimal Rp{" "}
@@ -788,7 +783,7 @@ export default function HematPage() {
                   </h3>
                   <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
                     Jam beban puncak malam hari lebih rentan menyebabkan MCB
-                    trip pada daya {golongan}.
+                    trip saat perangkat aktif bersamaan.
                   </p>
                 </div>
               </div>
@@ -801,7 +796,7 @@ export default function HematPage() {
                   check_circle
                 </span>
                 <span className="text-xs sm:text-sm font-semibold truncate">
-                  Rumah Tangga R-1/{golongan} Terkendali
+                  {deviceOptions.length} Perangkat Terpantau Terkendali
                 </span>
               </div>
               <span className="px-2.5 py-0.5 rounded-full bg-white/15 text-[11px] font-semibold shrink-0 whitespace-nowrap">

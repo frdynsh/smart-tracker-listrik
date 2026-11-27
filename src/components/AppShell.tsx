@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/supabase";
 
 interface NavItem {
   label: string;
@@ -232,7 +232,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">            
+          <div className="flex items-center gap-3 shrink-0">
             <Link
               href="/pengingat"
               title="Notifikasi Peringatan"

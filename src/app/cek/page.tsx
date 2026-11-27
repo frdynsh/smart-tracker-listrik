@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/supabase";
 
 interface DeviceRow {
   id: string;
@@ -73,7 +73,6 @@ export default function CekPage() {
   const [readings, setReadings] = useState<ReadingRow[]>([]);
   const [sevenDayReadings, setSevenDayReadings] = useState<ReadingRow[]>([]);
   const [tarif, setTarif] = useState<number>(1444.7);
-  const [golongan, setGolongan] = useState<string>("R-1/TR 900 VA");
   const [batasAmanRp, setBatasAmanRp] = useState<number>(50000);
   // null = default (tampilkan gabungan semua perangkat tanpa ada item "Semua Perangkat" di daftar)
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
@@ -97,7 +96,7 @@ export default function CekPage() {
       await Promise.all([
         supabase
           .from("profiles")
-          .select("tarif_per_kwh, golongan_daya")
+          .select("tarif_per_kwh")
           .eq("id", user.id)
           .single(),
         supabase
@@ -117,9 +116,6 @@ export default function CekPage() {
       const tVal = Number(profile.tarif_per_kwh);
       setTarif(tVal);
       setTarifInput(String(tVal));
-    }
-    if (profile?.golongan_daya) {
-      setGolongan(profile.golongan_daya);
     }
     if (budgetRule?.ambang) {
       setBatasAmanRp(Number(budgetRule.ambang));
@@ -814,7 +810,7 @@ export default function CekPage() {
                       Tarif Listrik: Rp {tarif.toLocaleString("id-ID")} / kWh
                     </span>
                     <span className="text-xs text-on-surface-variant truncate">
-                      Golongan {golongan}
+                      Tarif dasar per kWh terpantau
                     </span>
                   </div>
                   <button

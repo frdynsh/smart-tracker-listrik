@@ -13,7 +13,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import jsQR from "jsqr";
 import AppShell from "@/components/AppShell";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/supabase";
 
 interface DeviceRow {
   id: string;

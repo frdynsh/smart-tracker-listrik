@@ -2,12 +2,10 @@
 import Link from "next/link";
 import FaqAccordion from "@/components/FaqAccordion";
 import { redirect } from "next/navigation";
-// Aktifkan import ini setelah setup Supabase SSR selesai:
-// import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/supabase";
 
 export default async function LandingPage() {
   // PRD 9.1: Pengguna yang sudah login langsung diarahkan ke Dashboard
-  /*
   const supabase = await createClient();
   const {
     data: { user },
@@ -16,7 +14,6 @@ export default async function LandingPage() {
   if (user) {
     redirect("/dashboard");
   }
-  */
 
   return (
     <div className="min-h-screen flex flex-col bg-surface text-on-surface overflow-x-clip antialiased tabular-nums">
