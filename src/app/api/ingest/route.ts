@@ -61,10 +61,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Filter Anti-Glitch PZEM-004T
-    if (v < 150 || v > 300 || i < 0 || i > 15 || p < 0 || p > 3500) {
+    // Filter Anti-Glitch PZEM-004T (10A)
+    if (v < 150 || v > 300 || i < 0 || i > 10.5 || p < 0 || p > 2500) {
       return NextResponse.json(
-        { error: "Nilai sensor di luar batas wajar" },
+        { error: "Nilai sensor di luar batas wajar (maks 10A)" },
         { status: 422 },
       );
     }

@@ -103,7 +103,6 @@ export default function PengingatPage() {
       ]);
 
     setNotifs((notifData as NotificationItem[]) || []);
-    setCurrentPage(1);
 
     (rulesData as AlertRule[] | null)?.forEach((r) => {
       if (r.tipe === "durasi_lama") {
