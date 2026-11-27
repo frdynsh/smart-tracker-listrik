@@ -148,7 +148,7 @@ export default function HematPage() {
           .single(),
         supabase
           .from("devices")
-          .select("id, nama, jenis_beban, lokasi")
+          .select("id, nama, jenis_beban, lokasi, daya_nominal_w")
           .eq("user_id", user.id)
           .order("created_at", { ascending: true }),
       ]);
@@ -196,7 +196,9 @@ export default function HematPage() {
                 activeReads.reduce((acc, r) => acc + Number(r.p), 0) /
                   activeReads.length,
               )
-            : getDefaultWatt(d.nama);
+            : d.daya_nominal_w && Number(d.daya_nominal_w) > 0
+              ? Math.round(Number(d.daya_nominal_w))
+              : getDefaultWatt(d.nama);
 
         return {
           id: d.id,
