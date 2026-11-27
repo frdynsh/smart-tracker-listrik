@@ -228,33 +228,44 @@ function PerangkatContent() {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
-    const [{ data: profile }, { data: devsData }, { data: readsData }] =
-      await Promise.all([
-        supabase
-          .from("profiles")
-          .select("tarif_per_kwh")
-          .eq("id", user.id)
-          .single(),
-        supabase
-          .from("devices")
-          .select(
-            "id, user_id, claim_code, nama, jenis_beban, lokasi, daya_nominal_w, last_seen_at, created_at",
-          )
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("readings")
-          .select("device_id, ts, v, i, p, e_wh")
-          .gte("ts", startOfToday.toISOString())
-          .order("ts", { ascending: true })
-          .limit(3000),
-      ]);
+    const [{ data: profile }, { data: devsData }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("tarif_per_kwh")
+        .eq("id", user.id)
+        .single(),
+      supabase
+        .from("devices")
+        .select(
+          "id, user_id, claim_code, nama, jenis_beban, lokasi, daya_nominal_w, last_seen_at, created_at",
+        )
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true }),
+    ]);
 
     if (profile?.tarif_per_kwh) {
       setTarif(Number(profile.tarif_per_kwh));
     }
-    setDevices((devsData as DeviceRow[]) || []);
-    setTodayReadings((readsData as ReadingRow[]) || []);
+
+    const userDevs = (devsData as DeviceRow[]) || [];
+    setDevices(userDevs);
+
+    if (userDevs.length > 0) {
+      const { data: readsData } = await supabase
+        .from("readings")
+        .select("device_id, ts, v, i, p, e_wh")
+        .in(
+          "device_id",
+          userDevs.map((d) => d.id),
+        )
+        .gte("ts", startOfToday.toISOString())
+        .order("ts", { ascending: true })
+        .limit(3000);
+
+      setTodayReadings((readsData as ReadingRow[]) || []);
+    } else {
+      setTodayReadings([]);
+    }
     setLoading(false);
   }, [supabase]);
 
@@ -411,7 +422,7 @@ function PerangkatContent() {
           ctx.drawImage(video, 0, 0, width, height);
           const imageData = ctx.getImageData(0, 0, width, height);
           const qrCode = jsQR(imageData.data, width, height, {
-            inversionAttempts: "dontInvert",
+            inversionAttempts: "attemptBoth",
           });
 
           if (qrCode && qrCode.data) {
@@ -1948,8 +1959,7 @@ function PerangkatContent() {
                     Standar Modul Resmi
                   </span>
                   <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
-                    Kompatibel dengan ESP32 NodeMCU V1 dan sensor PZEM-004T v3.0
-                    (AC 80-260V 100A).
+                    Kompatibel dengan ESP32 NodeMCU V1 dan sensor PZEM-004T v3.0.
                   </p>
                 </div>
               </div>
