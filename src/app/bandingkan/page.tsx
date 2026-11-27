@@ -114,25 +114,18 @@ export default function BandingkanPage() {
     const lastMonday = new Date(thisMonday);
     lastMonday.setDate(thisMonday.getDate() - 7);
 
-    const [{ data: profile }, { data: devsData }, { data: readsData }] =
-      await Promise.all([
-        supabase
-          .from("profiles")
-          .select("tarif_per_kwh")
-          .eq("id", user.id)
-          .single(),
-        supabase
-          .from("devices")
-          .select("id, nama, jenis_beban, lokasi, last_seen_at")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("readings")
-          .select("id, device_id, ts, p, e_wh")
-          .gte("ts", lastMonday.toISOString())
-          .order("ts", { ascending: true })
-          .limit(2000),
-      ]);
+    const [{ data: profile }, { data: devsData }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("tarif_per_kwh")
+        .eq("id", user.id)
+        .single(),
+      supabase
+        .from("devices")
+        .select("id, nama, jenis_beban, lokasi, last_seen_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true }),
+    ]);
 
     if (profile?.tarif_per_kwh) {
       setTarif(Number(profile.tarif_per_kwh));
@@ -144,7 +137,23 @@ export default function BandingkanPage() {
       setSelectedDeviceId(devList[0].id);
     }
 
-    setReadings((readsData as ReadingRow[]) || []);
+    if (devList.length > 0) {
+      const { data: readsData } = await supabase
+        .from("readings")
+        .select("id, device_id, ts, p, e_wh")
+        .in(
+          "device_id",
+          devList.map((d) => d.id),
+        )
+        .gte("ts", lastMonday.toISOString())
+        .order("ts", { ascending: true })
+        .limit(4000);
+
+      setReadings((readsData as ReadingRow[]) || []);
+    } else {
+      setReadings([]);
+    }
+
     setLoading(false);
   }, [supabase, selectedDeviceId]);
 
@@ -166,7 +175,6 @@ export default function BandingkanPage() {
     lastWeekStats,
     diffStats,
     allDevicesComparison,
-    hasRealData,
   } = useMemo(() => {
     const thisMonday = getMondayStart(new Date());
     const lastMonday = new Date(thisMonday);
@@ -236,9 +244,6 @@ export default function BandingkanPage() {
     const devId = activeDevice?.id || "";
     const nextMonday = new Date(thisMonday);
     nextMonday.setDate(thisMonday.getDate() + 7);
-
-    const realDataExists =
-      devId !== "" && readings.some((r) => r.device_id === devId);
 
     // 7 hari (Senin - Minggu)
     const bars = Array.from({ length: 7 }, (_, i) => {
@@ -375,7 +380,6 @@ export default function BandingkanPage() {
         monthlySaveEstimate,
       },
       allDevicesComparison: devComparisons,
-      hasRealData: realDataExists,
     };
   }, [activeDevice, devices, readings, tarif]);
 

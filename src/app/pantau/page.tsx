@@ -62,7 +62,7 @@ export default function PantauPage() {
   const [deviceDropdownOpen, setDeviceDropdownOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
-  const [range, setRange] = useState<"today" | "7d">("today");
+  const [range, setRange] = useState<"today" | "7d" | "30d">("today");
   const [unit, setUnit] = useState<"rupiah" | "kwh">("rupiah");
   const [showTable, setShowTable] = useState<boolean>(false);
   const [tablePage, setTablePage] = useState<number>(1);
@@ -149,8 +149,11 @@ export default function PantauPage() {
     const startTime = new Date();
     if (range === "today") {
       startTime.setHours(0, 0, 0, 0);
-    } else {
+    } else if (range === "7d") {
       startTime.setDate(startTime.getDate() - 7);
+      startTime.setHours(0, 0, 0, 0);
+    } else {
+      startTime.setDate(startTime.getDate() - 30);
       startTime.setHours(0, 0, 0, 0);
     }
 
@@ -404,6 +407,13 @@ export default function PantauPage() {
   const isMultiAllView =
     selectedDevice === "all" && activeSeriesList.length > 1;
 
+  const rangeSuffixTitle =
+    range === "today"
+      ? "per Jam (Hari Ini)"
+      : range === "7d"
+        ? "per Hari (7 Hari Terakhir)"
+        : "per Hari (30 Hari Terakhir)";
+
   return (
     <AppShell>
       <div className="flex flex-col w-full max-w-full overflow-x-hidden gap-4 sm:gap-6">
@@ -483,7 +493,14 @@ export default function PantauPage() {
             <button
               type="button"
               disabled={!has30DayData}
-              className="min-h-[40px] px-3.5 sm:px-4 py-2 rounded-lg bg-surface text-on-surface-variant/45 text-xs sm:text-sm font-semibold cursor-not-allowed flex items-center gap-1.5 sm:gap-2 whitespace-nowrap"
+              onClick={() => setRange("30d")}
+              className={`min-h-[40px] px-3.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5 sm:gap-2 whitespace-nowrap ${
+                !has30DayData
+                  ? "bg-surface text-on-surface-variant/45 cursor-not-allowed"
+                  : range === "30d"
+                    ? "bg-primary-container text-on-primary shadow-2xs cursor-pointer"
+                    : "bg-surface hover:bg-surface-container text-on-surface cursor-pointer"
+              }`}
             >
               <span>30 Hari</span>
             </button>
@@ -644,12 +661,8 @@ export default function PantauPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="font-bold text-base sm:text-lg md:text-[22px] text-on-surface leading-snug">
                     {unit === "rupiah"
-                      ? `Grafik Biaya Pemakaian per Jam (${
-                          range === "today" ? "Hari Ini" : "7 Hari Terakhir"
-                        })`
-                      : `Grafik Konsumsi Energi per Jam (${
-                          range === "today" ? "Hari Ini" : "7 Hari Terakhir"
-                        })`}
+                      ? `Grafik Biaya Pemakaian ${rangeSuffixTitle}`
+                      : `Grafik Konsumsi Energi ${rangeSuffixTitle}`}
                   </h2>
                   <span className="text-xs px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-semibold shrink-0">
                     WIB (UTC+7)
@@ -896,7 +909,7 @@ export default function PantauPage() {
                           {ser.nama}
                         </span>
                         <span className="text-xs text-on-surface-variant">
-                          • {ser.dayaNominal} Watt
+                          - {ser.dayaNominal} Watt
                         </span>
                       </button>
                     ))}
@@ -1068,7 +1081,11 @@ export default function PantauPage() {
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm text-on-surface-variant font-semibold">
-                  {range === "today" ? "Biaya Hari Ini" : "Biaya 7 Hari"}
+                  {range === "today"
+                    ? "Biaya Hari Ini"
+                    : range === "7d"
+                      ? "Biaya 7 Hari"
+                      : "Biaya 30 Hari"}
                 </span>
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-semibold whitespace-nowrap shrink-0">
                   Estimasi
@@ -1087,7 +1104,9 @@ export default function PantauPage() {
               <span className="text-xs font-medium">
                 {range === "today"
                   ? "Terhitung sejak 00.00 WIB"
-                  : "Akumulasi 7 hari terakhir"}
+                  : range === "7d"
+                    ? "Akumulasi 7 hari terakhir"
+                    : "Akumulasi 30 hari terakhir"}
               </span>
             </div>
           </div>
