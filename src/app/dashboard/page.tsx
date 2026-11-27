@@ -238,17 +238,25 @@ export default function DashboardPage() {
     setRetryFeedback("idle");
     await fetchDashboardData();
 
-    setTimeout(() => {
+    const targetId = selectedOfflineDevice?.id;
+    if (!targetId) {
       setRetrying(false);
-      const targetId = selectedOfflineDevice?.id;
-      const refreshed = devices.find((d) => d.id === targetId);
-      const stillOff =
-        !refreshed?.last_seen_at ||
-        Date.now() - new Date(refreshed.last_seen_at).getTime() >
-          OFFLINE_THRESHOLD_MS;
+      return;
+    }
 
-      setRetryFeedback(stillOff ? "still_offline" : "success");
-    }, 1000);
+    const { data: freshDev } = await supabase
+      .from("devices")
+      .select("last_seen_at")
+      .eq("id", targetId)
+      .single();
+
+    setRetrying(false);
+    const stillOff =
+      !freshDev?.last_seen_at ||
+      Date.now() - new Date(freshDev.last_seen_at).getTime() >
+        OFFLINE_THRESHOLD_MS;
+
+    setRetryFeedback(stillOff ? "still_offline" : "success");
   };
 
   const activeOfflineTarget = selectedOfflineDevice
